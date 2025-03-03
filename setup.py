@@ -1,7 +1,7 @@
 from setuptools import find_packages, setup
 
 setup(
-    name="Core Assist",
+    name="core_assist",
     version="0.0.10",
     description="Standard Library for computer vision team",
     packages=find_packages(where="."),  # Search all subdirectories for packages
