@@ -1,1 +1,1 @@
-from core_assist.validate import *
+import core_assist.validate
