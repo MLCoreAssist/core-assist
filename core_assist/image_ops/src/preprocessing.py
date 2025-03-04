@@ -29,14 +29,10 @@ def blend(
     """
     try:
         if image1 is None or image2 is None:
-            raise ValueError(
-                "One or both input images are None. Cannot blend."
-            )
+            raise ValueError("One or both input images are None. Cannot blend.")
 
         if image1.shape != image2.shape:
-            raise ValueError(
-                "Input images must have the same dimensions for blending."
-            )
+            raise ValueError("Input images must have the same dimensions for blending.")
 
         if not (0 <= alpha <= 1) or not (0 <= beta <= 1):
             raise ValueError("Alpha and beta must be between 0 and 1.")
@@ -139,9 +135,7 @@ def detect_edges(
     """
     try:
         if image is None:
-            raise ValueError(
-                "Input image is None. Cannot perform edge detection."
-            )
+            raise ValueError("Input image is None. Cannot perform edge detection.")
 
         if method not in ["canny", "sobel", "laplacian"]:
             raise ValueError(
@@ -160,19 +154,13 @@ def detect_edges(
             edges = cv2.Canny(gray_image, threshold1, threshold2)
         elif method == "sobel":
             # Sobel edge detection (X and Y gradients)
-            sobelx = cv2.Sobel(
-                gray_image, cv2.CV_64F, 1, 0, ksize=ksize
-            )  # Sobel X
-            sobely = cv2.Sobel(
-                gray_image, cv2.CV_64F, 0, 1, ksize=ksize
-            )  # Sobel Y
+            sobelx = cv2.Sobel(gray_image, cv2.CV_64F, 1, 0, ksize=ksize)  # Sobel X
+            sobely = cv2.Sobel(gray_image, cv2.CV_64F, 0, 1, ksize=ksize)  # Sobel Y
             # Combine gradients to get edge magnitude
             edges = cv2.magnitude(sobelx, sobely).astype(np.uint8)
         elif method == "laplacian":
             # Laplacian edge detection
-            edges = cv2.Laplacian(gray_image, cv2.CV_64F, ksize=ksize).astype(
-                np.uint8
-            )
+            edges = cv2.Laplacian(gray_image, cv2.CV_64F, ksize=ksize).astype(np.uint8)
 
         return edges
 
@@ -220,9 +208,7 @@ def extract_contours(
             retrieval_mode not in retrieval_modes
             or approximation_mode not in approximation_modes
         ):
-            raise ValueError(
-                "Invalid retrieval or approximation mode specified."
-            )
+            raise ValueError("Invalid retrieval or approximation mode specified.")
 
         # Detect contours
         contours, hierarchy = cv2.findContours(
@@ -267,9 +253,7 @@ def blend_with_mask(
     """
     try:
         if background is None or foreground is None or mask is None:
-            raise ValueError(
-                "Background, foreground, or mask is None. Cannot blend."
-            )
+            raise ValueError("Background, foreground, or mask is None. Cannot blend.")
 
         if not (0 <= alpha <= 1) or not (0 <= beta <= 1):
             raise ValueError("Alpha and beta must be between 0 and 1.")

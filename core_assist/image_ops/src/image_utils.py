@@ -117,7 +117,7 @@ def load_gray(img_path: str) -> Optional[np.ndarray]:
 
 
 # Load RGB image from buffer
-def load_buffer_rgb(buffer_data:BytesIO):
+def load_buffer_rgb(buffer_data: BytesIO):
     """
     Loads an image from buffer data and converts it to RGB mode.
 
@@ -145,7 +145,7 @@ def load_buffer_rgb(buffer_data:BytesIO):
 
 
 # Load BGR image from buffer
-def load_buffer_bgr(buffer_data:BytesIO):
+def load_buffer_bgr(buffer_data: BytesIO):
     """
     Loads an image from buffer data and returns it in BGR mode.
 
@@ -169,7 +169,7 @@ def load_buffer_bgr(buffer_data:BytesIO):
 
 
 # Load gray image from buffer
-def load_buffer_gray(buffer_data:BytesIO):
+def load_buffer_gray(buffer_data: BytesIO):
     """
     Loads an image from buffer data and converts it to grayscale.
 
@@ -193,9 +193,7 @@ def load_buffer_gray(buffer_data:BytesIO):
 
 
 # Save Image (Format)
-def save_image(
-    image: np.ndarray, filename: str, file_format: str = ".jpg"
-) -> None:
+def save_image(image: np.ndarray, filename: str, file_format: str = ".jpg") -> None:
     """
     Saves the image to the specified file and format.
 
@@ -278,9 +276,7 @@ def resize(
     interpolation = cv2.INTER_NEAREST if is_mask else cv2.INTER_AREA
 
     # Resize the image
-    return cv2.resize(
-        image, (target_width, target_height), interpolation=interpolation
-    )
+    return cv2.resize(image, (target_width, target_height), interpolation=interpolation)
 
 
 # Crop Image
@@ -400,9 +396,7 @@ def convert_color_space(image: np.ndarray, color_space: str):
     """
     try:
         if image is None:
-            raise ValueError(
-                "Input image is None. Cannot convert color space."
-            )
+            raise ValueError("Input image is None. Cannot convert color space.")
         if color_space == "GRAY":
             # Convert the image to grayscale
             converted_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -413,9 +407,7 @@ def convert_color_space(image: np.ndarray, color_space: str):
             # Convert the image to HSV format
             converted_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         else:
-            raise ValueError(
-                "Unsupported color space. Use 'GRAY', 'RGB', or 'HSV'."
-            )
+            raise ValueError("Unsupported color space. Use 'GRAY', 'RGB', or 'HSV'.")
 
         return converted_image
     except Exception as e:
