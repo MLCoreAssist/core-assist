@@ -7,7 +7,6 @@ setup(
     packages=find_packages(where="."),  # Search all subdirectories for packages
     include_package_data=True,
     author="Aman Gupta , Mukul Kumar , Mohd Saqib , Rohit Chandra Maurya",
-
     install_requires=[
         "opencv-python",
         "numpy",
@@ -16,10 +15,9 @@ setup(
         "imagesize",
         "seaborn",
         "scikit-learn",
-        "scikit-multilearn"
+        "scikit-multilearn",
     ],
     extras_require={
-
         "dev": ["pytest>=7.0", "twine>=4.0.2"],
     },
     python_requires=">=3.8",
