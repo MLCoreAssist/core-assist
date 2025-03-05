@@ -1,0 +1,15 @@
+opencv-python
+numpy
+matplotlib
+altair
+imagesize
+seaborn
+scikit-learn
+scikit-multilearn
+pycocotools
+tqdm
+tabulate
+pyyaml
+mediapy
+pillow<10.0
+bounding_box
