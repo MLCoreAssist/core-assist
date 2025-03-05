@@ -1,25 +1,24 @@
-import numpy as np
-from sklearn.metrics import confusion_matrix , f1_score , precision_score , recall_score
-from sklearn.metrics import precision_recall_fscore_support 
-import numpy as np
-from core_assist.plot import plot
-from core_assist.image_ops.src.image_utils import load_rgb
-import traceback
 import json
-import json
-import numpy as np
-from concurrent.futures import ThreadPoolExecutor
-import pandas as pd
-import random
-import matplotlib.pyplot as plt
-import os
 import math
-import seaborn as sns
-import json
+import os
+import random
 import traceback
+from concurrent.futures import ThreadPoolExecutor
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from sklearn.metrics import (confusion_matrix, f1_score,
+                             precision_recall_fscore_support, precision_score,
+                             recall_score)
+
+from core_assist.image_ops.src.image_utils import load_rgb
+from core_assist.plot import plot
+
 
 class Image:
-    def __init__(self, gt_json_path, pred_json_path):
+    def __init__(self, gt_json_path: str, pred_json_path: str):
         self.gt_anno = self.load_json(gt_json_path)
         self.pred_anno = self.load_json(pred_json_path)
         self.img_path = self.gt_anno["image_path"]
@@ -51,22 +50,37 @@ class Image:
             with open(json_path, "r") as f:
                 res = json.load(f)
         except Exception as e:
-            raise ValueError(f"Error loading JSON file {json_path}: {traceback.format_exc()}")
+            raise ValueError(
+                f"Error loading JSON file {json_path}: {traceback.format_exc()}"
+            )
 
         return res
 
 
 class DatasetStats:
-    def __init__(self, gt_json_paths = None , pred_json_paths = None ,classes = None, y_true = None , y_pred = None , pred_score=None):
+    def __init__(
+        self,
+        gt_json_paths: list = None,
+        pred_json_paths: list = None,
+        classes: list = None,
+        y_true: list = None,
+        y_pred: list = None,
+        pred_score: list = None,
+    ):
 
-        self.all_image_objects , self.dataframe = self.get_image_objs_df(gt_json_paths= gt_json_paths ,pred_json_paths=pred_json_paths ,y_true = y_true , y_pred = y_pred , pred_score=pred_score)
+        self.all_image_objects, self.dataframe = self.get_image_objs_df(
+            gt_json_paths=gt_json_paths,
+            pred_json_paths=pred_json_paths,
+            y_true=y_true,
+            y_pred=y_pred,
+            pred_score=pred_score,
+        )
         self.y_true = None
         self.y_pred = None
         self.classes = classes
         self.cm = None
 
-
-    def get_stats(self, averaging_methods=['micro', 'macro', 'weighted']):
+    def get_stats(self, averaging_methods=["micro", "macro", "weighted"]):
         """
         Computes precision, recall, F1-score for each class and dataset-wide metrics.
 
@@ -81,35 +95,47 @@ class DatasetStats:
         # self.classes = np.unique(self.dataframe["pred_label"].to_list())
         self.cm = self.compute_confusion_matrix()
 
-        valid_methods = {'binary', 'micro', 'macro', 'weighted'}
-        assert all(method in valid_methods for method in averaging_methods), \
-            f"Invalid averaging method. Choose from {valid_methods}"
+        valid_methods = {"binary", "micro", "macro", "weighted"}
+        assert all(
+            method in valid_methods for method in averaging_methods
+        ), f"Invalid averaging method. Choose from {valid_methods}"
 
         # Compute per-class metrics
-        precision, recall, f1, support = precision_recall_fscore_support(self.y_true, self.y_pred, average=None)
+        precision, recall, f1, support = precision_recall_fscore_support(
+            self.y_true, self.y_pred, average=None
+        )
 
-        per_class_results = pd.DataFrame({
-            'Precision': precision,
-            'Recall': recall,
-            'F1': f1,
-            'Support': support.astype(int)  # Ensure support is integer
-        }, index=self.classes)
+        per_class_results = pd.DataFrame(
+            {
+                "Precision": precision,
+                "Recall": recall,
+                "F1": f1,
+                "Support": support.astype(int),  # Ensure support is integer
+            },
+            index=self.classes,
+        )
 
         print(f"\nPer-Class Metrics:\n{per_class_results.to_markdown()}\n")
 
         # Compute dataset-wide metrics
         dataset_results = {
-            'Precision': [precision_score(self.y_true, self.y_pred, average=method) for method in averaging_methods],
-            'Recall': [recall_score(self.y_true, self.y_pred, average=method) for method in averaging_methods],
-            'F1': [f1_score(self.y_true, self.y_pred, average=method) for method in averaging_methods]
+            "Precision": [
+                precision_score(self.y_true, self.y_pred, average=method)
+                for method in averaging_methods
+            ],
+            "Recall": [
+                recall_score(self.y_true, self.y_pred, average=method)
+                for method in averaging_methods
+            ],
+            "F1": [
+                f1_score(self.y_true, self.y_pred, average=method)
+                for method in averaging_methods
+            ],
         }
 
         self.dataset_result = pd.DataFrame(dataset_results, index=averaging_methods)
 
         print(f"\nEvaluation Results:\n{self.dataset_result.to_markdown()}\n")
-
-
-
 
     def compute_confusion_matrix(self):
         """
@@ -119,9 +145,15 @@ class DatasetStats:
             np.array: Confusion matrix.
         """
         return confusion_matrix(self.y_true, self.y_pred, labels=self.classes)
-    
 
-    def get_image_objs_df(self, gt_json_paths=None, pred_json_paths=None, y_true=None, y_pred=None, pred_score=None):
+    def get_image_objs_df(
+        self,
+        gt_json_paths=None,
+        pred_json_paths=None,
+        y_true=None,
+        y_pred=None,
+        pred_score=None,
+    ):
         """
         Generates a DataFrame containing image metadata and object annotations in parallel.
 
@@ -144,7 +176,7 @@ class DatasetStats:
         results = []
 
         def process_json(gt_path, pred_path):
-            """ Reads JSON files and extracts necessary data. """
+            """Reads JSON files and extracts necessary data."""
             if not os.path.exists(gt_path) or not os.path.exists(pred_path):
                 return None  # Skip missing files
 
@@ -153,7 +185,7 @@ class DatasetStats:
             with open(pred_path, "r") as f:
                 pred_res = json.load(f)
 
-            img_obj = Image(gt_path , pred_path)
+            img_obj = Image(gt_path, pred_path)
             all_image_obj.setdefault(img_obj.image_name, []).append(img_obj)
 
             return {
@@ -167,8 +199,10 @@ class DatasetStats:
         # Use ThreadPoolExecutor for parallel file reading
         if gt_json_paths and pred_json_paths:
             with ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
-                results = list(executor.map(process_json, gt_json_paths, pred_json_paths))
-            
+                results = list(
+                    executor.map(process_json, gt_json_paths, pred_json_paths)
+                )
+
             # Filter out None values (failed file loads)
             results = [r for r in results if r]
 
@@ -178,17 +212,15 @@ class DatasetStats:
 
         # Case 2: If no JSONs, use manually provided values
         if y_true is not None and y_pred is not None and pred_score is not None:
-            df = pd.DataFrame({
-                "gt_label": y_true,
-                "pred_label": y_pred,
-                "pred_scores": pred_score
-            })
+            df = pd.DataFrame(
+                {"gt_label": y_true, "pred_label": y_pred, "pred_scores": pred_score}
+            )
             return {}, df
 
         # Case 3: If no valid input, return empty results
         return {}, pd.DataFrame()
 
-    def filter_data(self, class_label, metric):
+    def filter_data(self, class_label: str, metric: str):
         """
         Filters the dataset based on a specific class and metric.
 
@@ -197,7 +229,7 @@ class DatasetStats:
             metric (str): The metric to filter by. Must be one of ['false_positive', 'true_positive', 'false_negative'].
 
         Returns:
-            DatasetStats | pd.DataFrame | None: 
+            DatasetStats | pd.DataFrame | None:
                 - A new DatasetStats object if image objects exist.
                 - A filtered DataFrame if no image objects exist.
                 - None if no matching data is found.
@@ -212,26 +244,38 @@ class DatasetStats:
 
         # Validate class_label
         if class_label not in self.classes:
-            raise ValueError(f"Invalid class_label: {class_label}. Must be one of {list(self.classes)}")
+            raise ValueError(
+                f"Invalid class_label: {class_label}. Must be one of {list(self.classes)}"
+            )
 
         # Validate metric
-        if metric not in ['false_positive', 'true_positive', 'false_negative']:
-            raise ValueError("Metric must be one of ['false_positive', 'true_positive', 'false_negative'].")
+        if metric not in ["false_positive", "true_positive", "false_negative"]:
+            raise ValueError(
+                "Metric must be one of ['false_positive', 'true_positive', 'false_negative']."
+            )
 
         # Apply filtering based on the metric
-        if metric == 'false_positive':
-            filtered_df = self.dataframe[(self.dataframe["pred_label"] == class_label) & 
-                                        (self.dataframe["gt_label"] != class_label)]
-        elif metric == 'true_positive':
-            filtered_df = self.dataframe[(self.dataframe["pred_label"] == class_label) & 
-                                        (self.dataframe["gt_label"] == class_label)]
-        elif metric == 'false_negative':
-            filtered_df = self.dataframe[(self.dataframe["pred_label"] != class_label) & 
-                                        (self.dataframe["gt_label"] == class_label)]
+        if metric == "false_positive":
+            filtered_df = self.dataframe[
+                (self.dataframe["pred_label"] == class_label)
+                & (self.dataframe["gt_label"] != class_label)
+            ]
+        elif metric == "true_positive":
+            filtered_df = self.dataframe[
+                (self.dataframe["pred_label"] == class_label)
+                & (self.dataframe["gt_label"] == class_label)
+            ]
+        elif metric == "false_negative":
+            filtered_df = self.dataframe[
+                (self.dataframe["pred_label"] != class_label)
+                & (self.dataframe["gt_label"] == class_label)
+            ]
 
         # If no matches, return None or an empty DataFrame
         if filtered_df.empty:
-            print(f"Warning: No data found for class '{class_label}' with metric '{metric}'.")
+            print(
+                f"Warning: No data found for class '{class_label}' with metric '{metric}'."
+            )
             return None if self.all_image_objects else filtered_df
 
         # If image objects exist, create a new DatasetStats object
@@ -248,10 +292,12 @@ class DatasetStats:
             new_instance.dataframe = filtered_df
             new_instance.y_true = filtered_df["gt_label"].to_list()
             new_instance.y_pred = filtered_df["pred_label"].to_list()
-            
+
             # Ensure `self.classes` only contains valid labels
             valid_classes = set(new_instance.y_true + new_instance.y_pred)
-            new_instance.classes = np.array(list(valid_classes))  # Ensure only existing labels are included
+            new_instance.classes = np.array(
+                list(valid_classes)
+            )  # Ensure only existing labels are included
 
             # Compute confusion matrix only if valid classes exist
             if new_instance.classes.size > 0:
@@ -264,48 +310,51 @@ class DatasetStats:
         # If no image objects, return only the filtered DataFrame
         return filtered_df
 
+    def plot(self, samples=5, rgb_flag=False) -> None:
+        """
+        Plots a given number of sample images in a grid layout using `display_multiple_images()`.
 
+        Args:
+            all_image_objects (dict): Dictionary of image objects.
+            samples (int): Number of images to plot. Defaults to 5.
+            rgb_flag (bool): If True, converts BGR images to RGB before displaying.
 
-    def plot(self, samples=5, rgb_flag=False):
-            """
-            Plots a given number of sample images in a grid layout using `display_multiple_images()`.
+        Raises:
+            ValueError: If `all_image_objects` is empty.
+        """
+        if not self.all_image_objects:
+            raise ValueError("No image objects available for plotting.")
 
-            Args:
-                all_image_objects (dict): Dictionary of image objects.
-                samples (int): Number of images to plot. Defaults to 5.
-                rgb_flag (bool): If True, converts BGR images to RGB before displaying.
+        # Flatten all image objects into a list
+        all_images = [
+            img_obj
+            for img_list in self.all_image_objects.values()
+            for img_obj in img_list
+        ]
 
-            Raises:
-                ValueError: If `all_image_objects` is empty.
-            """
-            if not self.all_image_objects:
-                raise ValueError("No image objects available for plotting.")
+        # Adjust sample size if needed
+        samples = min(samples, len(all_images))
 
-            # Flatten all image objects into a list
-            all_images = [img_obj for img_list in self.all_image_objects.values() for img_obj in img_list]
+        # Randomly select `samples` number of images
+        selected_images = random.sample(all_images, samples)
 
-            # Adjust sample size if needed
-            samples = min(samples, len(all_images))
+        # Extract image paths and labels
+        image_paths = [img_obj.img_path for img_obj in selected_images]
+        labels = [
+            f"GT: {img_obj.gt_anno['annotations'].get('label', [None])[0]}\n"
+            f"Pred: {img_obj.pred_anno['predictions'].get('label', [None])[0]} "
+            f"({img_obj.pred_anno['predictions'].get('score', [None])[0]:.2f})"
+            for img_obj in selected_images
+        ]
 
-            # Randomly select `samples` number of images
-            selected_images = random.sample(all_images, samples)
+        # Compute optimal grid layout (rows & cols)
+        cols = min(5, samples)  # Limit to max 5 columns
+        rows = math.ceil(samples / cols)
 
-            # Extract image paths and labels
-            image_paths = [img_obj.img_path for img_obj in selected_images]
-            labels = [
-                f"GT: {img_obj.gt_anno['annotations'].get('label', [None])[0]}\n"
-                f"Pred: {img_obj.pred_anno['predictions'].get('label', [None])[0]} "
-                f"({img_obj.pred_anno['predictions'].get('score', [None])[0]:.2f})"
-                for img_obj in selected_images
-            ]
-
-            # Compute optimal grid layout (rows & cols)
-            cols = min(5, samples)  # Limit to max 5 columns
-            rows = math.ceil(samples / cols)
-
-            # Call display function
-            plot.display_multiple_images(image_paths, labels=labels, rows=rows, cols=cols, rgb_flag=rgb_flag)
-
+        # Call display function
+        plot.display_multiple_images(
+            image_paths, labels=labels, rows=rows, cols=cols, rgb_flag=rgb_flag
+        )
 
     def _plot_confusion_matrix(self, normalize=True, cmap="Blues"):
         """
@@ -323,7 +372,9 @@ class DatasetStats:
 
         # Compute percentage-wise confusion matrix if normalize is True
         if normalize:
-            cm_display = np.array([row / np.sum(row) if np.sum(row) > 0 else row for row in self.cm])
+            cm_display = np.array(
+                [row / np.sum(row) if np.sum(row) > 0 else row for row in self.cm]
+            )
             fmt = ".2%"  # Format for percentage
             title = "Confusion Matrix (Percentage)"
         else:
@@ -343,9 +394,12 @@ class DatasetStats:
         plt.title(title)
         plt.show()
 
-
-                
-    def plot_metric(self, metric_type="confusion_matrix", cmap="Blues", normalize=False):
+    def plot_metric(
+        self,
+        metric_type: str = "confusion_matrix",
+        cmap: str = "Blues",
+        normalize: bool = False,
+    ):
         """Plots either the confusion matrix or a violin plot of predicted scores.
 
             This function provides a way to visualize evaluation metrics. It can display
@@ -364,24 +418,33 @@ class DatasetStats:
         if metric_type == "confusion_matrix":
             self._plot_confusion_matrix(normalize=normalize, cmap=cmap)
         elif metric_type == "score":
-            if not hasattr(self, 'dataframe'):  # Check if dataframe exists
-                raise ValueError("Dataframe is required for score plot. Ensure it's available.")
+            if not hasattr(self, "dataframe"):  # Check if dataframe exists
+                raise ValueError(
+                    "Dataframe is required for score plot. Ensure it's available."
+                )
             if self.dataframe.empty:
                 raise ValueError("Dataframe is empty. Ensure data is available.")
 
             fig, ax = plt.subplots(figsize=(10, 5))  # Create figure and axes
 
-            sns.violinplot(x=self.dataframe["pred_scores"], y=self.dataframe["pred_label"], ax=ax) # Fixed column names
+            sns.violinplot(
+                x=self.dataframe["pred_scores"], y=self.dataframe["pred_label"], ax=ax
+            )  # Fixed column names
             ax.set_xlabel("Predicted Label", fontsize=14)  # Increased font size
             ax.set_ylabel("Predicted Scores", fontsize=14)  # Increased font size
-            ax.set_title("Predicted Scores by Label", fontsize=16) # Increased font size
-            plt.xticks(rotation=45, ha='right', fontsize=12)  # Rotated x-axis labels for readability, increased font size
+            ax.set_title(
+                "Predicted Scores by Label", fontsize=16
+            )  # Increased font size
+            plt.xticks(
+                rotation=45, ha="right", fontsize=12
+            )  # Rotated x-axis labels for readability, increased font size
             plt.yticks(fontsize=12)  # Increased font size
-            plt.tight_layout() # Adjust layout to prevent labels from overlapping
+            plt.tight_layout()  # Adjust layout to prevent labels from overlapping
             plt.show()
         else:
-            raise ValueError("Invalid metric_type. Must be 'confusion_matrix' or 'score'.")
-
+            raise ValueError(
+                "Invalid metric_type. Must be 'confusion_matrix' or 'score'."
+            )
 
     def compute_confusion_matrix(self):
         """
@@ -401,7 +464,7 @@ class DatasetStats:
         """
         return np.mean(np.array(self.y_true) == np.array(self.y_pred))
 
-    def precision(self, average='binary'):
+    def precision(self, average="binary"):
         """
         Computes the precision score.
 
@@ -414,26 +477,32 @@ class DatasetStats:
         Raises:
             ValueError: If invalid average is provided.
         """
-        if average not in ['binary', 'macro', 'micro', 'weighted']:
-            raise ValueError("Invalid value for average. Choose from 'binary', 'macro', 'micro', 'weighted'.")
-        
-        if average == 'binary':
+        if average not in ["binary", "macro", "micro", "weighted"]:
+            raise ValueError(
+                "Invalid value for average. Choose from 'binary', 'macro', 'micro', 'weighted'."
+            )
+
+        if average == "binary":
             tp = self.cm[1, 1]
             fp = self.cm[0, 1]
             return tp / (tp + fp) if tp + fp > 0 else 0
-        elif average in ['macro', 'weighted']:
+        elif average in ["macro", "weighted"]:
             precisions = []
             for i in range(len(self.cm)):
                 tp = self.cm[i, i]
                 fp = np.sum(self.cm[:, i]) - tp
                 precisions.append(tp / (tp + fp) if tp + fp > 0 else 0)
-            return np.mean(precisions) if average == 'macro' else np.average(precisions, weights=np.sum(self.cm, axis=1))
-        elif average == 'micro':
+            return (
+                np.mean(precisions)
+                if average == "macro"
+                else np.average(precisions, weights=np.sum(self.cm, axis=1))
+            )
+        elif average == "micro":
             tp = np.trace(self.cm)
             fp = np.sum(self.cm) - tp
             return tp / (tp + fp) if tp + fp > 0 else 0
 
-    def recall(self, average='binary'):
+    def recall(self, average="binary"):
         """
         Computes the recall score.
 
@@ -446,28 +515,32 @@ class DatasetStats:
         Raises:
             ValueError: If invalid average is provided.
         """
-        if average not in ['binary', 'macro', 'micro', 'weighted']:
-            raise ValueError("Invalid value for average. Choose from 'binary', 'macro', 'micro', 'weighted'.")
-        
-        if average == 'binary':
+        if average not in ["binary", "macro", "micro", "weighted"]:
+            raise ValueError(
+                "Invalid value for average. Choose from 'binary', 'macro', 'micro', 'weighted'."
+            )
+
+        if average == "binary":
             tp = self.cm[1, 1]
             fn = self.cm[1, 0]
             return tp / (tp + fn) if tp + fn > 0 else 0
-        elif average in ['macro', 'weighted']:
+        elif average in ["macro", "weighted"]:
             recalls = []
             for i in range(len(self.cm)):
                 tp = self.cm[i, i]
                 fn = np.sum(self.cm[i, :]) - tp
                 recalls.append(tp / (tp + fn) if tp + fn > 0 else 0)
-            return np.mean(recalls) if average == 'macro' else np.average(recalls, weights=np.sum(self.cm, axis=1))
-        elif average == 'micro':
+            return (
+                np.mean(recalls)
+                if average == "macro"
+                else np.average(recalls, weights=np.sum(self.cm, axis=1))
+            )
+        elif average == "micro":
             tp = np.trace(self.cm)
             fn = np.sum(self.cm) - tp
             return tp / (tp + fn) if tp + fn > 0 else 0
 
-
-
-    def f1_scores(self , average='binary'):
+    def f1_scores(self, average="binary"):
         """
         Computes the F1 score based on the given confusion matrix.
 
@@ -481,9 +554,11 @@ class DatasetStats:
         Raises:
             ValueError: If invalid average is provided.
         """
-        if average not in ['binary', 'macro', 'micro', 'weighted']:
-            raise ValueError("Invalid value for average. Choose from 'binary', 'macro', 'micro', 'weighted'.")
-        
+        if average not in ["binary", "macro", "micro", "weighted"]:
+            raise ValueError(
+                "Invalid value for average. Choose from 'binary', 'macro', 'micro', 'weighted'."
+            )
+
         conf_matrix = self.cm
 
         # True Positives, False Positives, False Negatives
@@ -497,27 +572,38 @@ class DatasetStats:
         recall = np.where((TP + FN) > 0, TP / (TP + FN), 0)
 
         # F1-score for each class
-        f1_per_class = np.where((precision + recall) > 0, 2 * (precision * recall) / (precision + recall), 0)
+        f1_per_class = np.where(
+            (precision + recall) > 0, 2 * (precision * recall) / (precision + recall), 0
+        )
 
-        if average == 'macro':
+        if average == "macro":
             return np.mean(f1_per_class)
 
-        elif average == 'micro':
+        elif average == "micro":
             total_TP = np.sum(TP)
             total_FP = np.sum(FP)
             total_FN = np.sum(FN)
-            precision_micro = total_TP / (total_TP + total_FP) if (total_TP + total_FP) > 0 else 0
-            recall_micro = total_TP / (total_TP + total_FN) if (total_TP + total_FN) > 0 else 0
-            return 2 * (precision_micro * recall_micro) / (precision_micro + recall_micro) if (precision_micro + recall_micro) > 0 else 0
+            precision_micro = (
+                total_TP / (total_TP + total_FP) if (total_TP + total_FP) > 0 else 0
+            )
+            recall_micro = (
+                total_TP / (total_TP + total_FN) if (total_TP + total_FN) > 0 else 0
+            )
+            return (
+                2 * (precision_micro * recall_micro) / (precision_micro + recall_micro)
+                if (precision_micro + recall_micro) > 0
+                else 0
+            )
 
-        elif average == 'weighted':
+        elif average == "weighted":
             return np.sum(f1_per_class * support) / np.sum(support)
 
-        elif average == 'binary':
+        elif average == "binary":
             if len(TP) != 2:
-                raise ValueError("Binary F1-score can only be computed for a 2-class confusion matrix.")
+                raise ValueError(
+                    "Binary F1-score can only be computed for a 2-class confusion matrix."
+                )
             return f1_per_class[1]  # Assuming the second class is the positive class
-
 
     def false_positives(self):
         """
@@ -556,5 +642,3 @@ class DatasetStats:
         total = np.sum(self.cm)
         tp_fp_fn = np.sum(self.cm, axis=1) + np.sum(self.cm, axis=0) - np.diag(self.cm)
         return total - tp_fp_fn
-
-

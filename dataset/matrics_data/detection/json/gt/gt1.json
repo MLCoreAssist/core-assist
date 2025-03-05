@@ -1,0 +1,28 @@
+{   "image_path" : "../dataset/matrics_data/detection/images/Auction_A1_20221106_130911.png",
+    "image_name":"Auction_A1_20221106_130911",
+    "height":1024,
+    "width" :1024,
+    "annotations": [
+        {
+            "label": "cat",
+            "bbox": [60, 60, 140, 140]
+        },
+        {
+            "label": "cat",
+            "bbox": [210, 120, 290, 120]
+        },
+        {
+            "label": "bird",
+            "bbox": [300, 300, 450, 450]
+        },
+        {
+            "label": "dog",
+            "bbox": [360, 300, 450, 450]
+        },
+        {
+            "label": "bird",
+            "bbox": [370, 300, 450, 450]
+        }
+    ]
+
+}

@@ -1,0 +1,12 @@
+{
+    "image_path": "../dataset/matrics_data/classification/images/5d6a3ec848f9d1.76489076.jpg",
+    "image_name": "5d6a3ec848f9d1.76489076.jpg",
+    "predictions": {
+        "label": [
+            "pickup"
+        ],
+        "score": [
+            1.0
+        ]
+    }
+}

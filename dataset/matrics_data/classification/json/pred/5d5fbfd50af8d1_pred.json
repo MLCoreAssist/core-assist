@@ -1,0 +1,12 @@
+{
+    "image_path": "../dataset/matrics_data/classification/images/5d5fbfd50af8d1.96559857.jpg",
+    "image_name": "5d5fbfd50af8d1.96559857.jpg",
+    "predictions": {
+        "label": [
+            "sports"
+        ],
+        "score": [
+            1.0
+        ]
+    }
+}

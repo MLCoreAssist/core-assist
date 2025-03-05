@@ -1,0 +1,12 @@
+{
+    "image_path": "../dataset/matrics_data/classification/images/13JAN_3336.png",
+    "image_name": "13JAN_3336.png",
+    "predictions": {
+        "label": [
+            "hatchback"
+        ],
+        "score": [
+            1.0
+        ]
+    }
+}

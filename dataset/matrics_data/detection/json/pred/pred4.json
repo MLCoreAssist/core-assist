@@ -1,0 +1,11 @@
+{"image_path" : "../dataset/matrics_data/detection/images/batch1_dent_img_000009.png",
+    "image_name":"batch1_dent_img_000009",
+    "height":1024,
+    "width" :1024,
+    "predictions":[   
+    {"image_id": 1,"bbox": [60, 60, 140, 140], "label": "cat", "score": 1},
+    {"image_id": 1,"bbox": [210, 120, 290, 120], "label": "dog", "score": 1},
+    {"image_id": 1,"bbox": [300, 300, 450, 450], "label": "bird", "score": 1},
+    {"image_id": 1,"bbox": [360, 300, 450, 450], "label": "dog", "score": 1},
+    {"image_id": 1,"bbox": [370, 300, 450, 450], "label": "bird", "score": 1}
+]}

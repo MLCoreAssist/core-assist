@@ -1,0 +1,11 @@
+{"image_path" : "../dataset/matrics_data/detection/images/Auction_A1_20221106_130911.png",
+    "image_name":"Auction_A1_20221106_130911",
+    "height":1024,
+    "width" :1024,
+    "predictions":[   
+    {"bbox": [500, 500, 580, 580], "label": "cat", "score": 0.9},
+    {"bbox": [600, 600, 680, 720], "label": "dog", "score": 0.85},
+    {"bbox": [700, 700, 850, 850], "label": "bird", "score": 0.75},
+    {"bbox": [800, 800, 890, 890], "label": "dog", "score": 0.75},
+    {"bbox": [900, 900, 980, 980], "label": "bird", "score": 0.75}
+]}

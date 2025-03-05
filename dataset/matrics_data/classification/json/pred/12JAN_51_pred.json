@@ -1,0 +1,12 @@
+{
+    "image_path": "../dataset/matrics_data/classification/images/12JAN_51.png",
+    "image_name": "12JAN_51.png",
+    "predictions": {
+        "label": [
+            "suv"
+        ],
+        "score": [
+            1.0
+        ]
+    }
+}

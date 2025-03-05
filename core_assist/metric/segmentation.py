@@ -1,44 +1,56 @@
-from typing import List ,Optional
-from pathlib import Path
-from core_assist.metric.utils import generate_classwise_tabulated_stats ,generate_overall_dataset_tabulated_stats , class_metric_to_df , overall_metric_to_df ,calculate_overall_metrics ,tabulate_map_res
-import numpy as np
-from core_assist.plot import plot
-from core_assist.image_ops.src.image_utils import load_rgb
-import traceback
-import json
-from tqdm import tqdm
-import json
-import numpy as np
-import threading
-from joblib import Parallel, delayed
-import pandas as pd
-from core_assist.metric.utils import transform_to_coco
-from pycocotools.coco import COCO
-from pycocotools.cocoeval import COCOeval
 import contextlib
 import io
+import json
 import random
-import pycocotools.mask as mask_util
-import matplotlib.pyplot as plt
+import threading
+import traceback
+from pathlib import Path
+from typing import List, Optional
 
-        
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import pycocotools.mask as mask_util
+from joblib import Parallel, delayed
+from pycocotools.coco import COCO
+from pycocotools.cocoeval import COCOeval
+from tqdm import tqdm
+
+from core_assist.image_ops.src.image_utils import load_rgb
+from core_assist.metric.utils import (calculate_overall_metrics,
+                                      class_metric_to_df,
+                                      generate_classwise_tabulated_stats,
+                                      generate_overall_dataset_tabulated_stats,
+                                      overall_metric_to_df, tabulate_map_res,
+                                      transform_to_coco)
+from core_assist.plot import plot
+
+
 class Image:
     def __init__(self, gt_json_path: str, pred_json_path: str):
         self.f1_score = {}
         self.precision = {}
-        self.recall = {} 
-        self.miou = {} 
+        self.recall = {}
+        self.miou = {}
         self.anno_path = gt_json_path
-        self.img_path  = None
+        self.img_path = None
         self.pred_path = pred_json_path
         self.results = {}
         self.height = None
         self.width = None
 
-
-    def plot(self, bbox=True, original_image=False, ground_truth_masks=False, ground_truth=True, pred_masks=False, predictions=True , segment_type = "both"):
+    def plot(
+        self,
+        bbox=True,
+        original_image=False,
+        ground_truth_masks=False,
+        ground_truth=True,
+        pred_masks=False,
+        predictions=True,
+        segment_type="both",
+    ):
         """
-        Visualizes the segmentation results by plotting the original image, 
+        Visualizes the segmentation results by plotting the original image,
         ground truth segmentation, predicted segmentation, and their masks.
 
         Args:
@@ -56,14 +68,12 @@ class Image:
         Returns:
             None: Displays the selected images using `plot.image()`.
         """
-    
 
-        gt_label , predictions_data = self.load_json()
+        gt_label, predictions_data = self.load_json()
 
         self.img_path = gt_label["image_path"]
         self.height = gt_label["height"]
         self.width = gt_label["width"]
-
 
         if self.img_path is None:
             raise ValueError("Image path is not set.")
@@ -71,17 +81,39 @@ class Image:
         img = load_rgb(self.img_path)
 
         # Extract ground truth masks and labels
-        gt_masks = [mask_util.decode(item['segmentation']) for item in gt_label["annotations"]]
-        gt_labels = [item['label'] for item in gt_label["annotations"]]
+        gt_masks = [
+            mask_util.decode(item["segmentation"]) for item in gt_label["annotations"]
+        ]
+        gt_labels = [item["label"] for item in gt_label["annotations"]]
 
         # Extract predicted masks, labels, and confidence scores
-        pred_mask = [mask_util.decode(item['segmentation']) for item in predictions_data["predictions"]]
-        pred_labels = [item['category_name'] for item in predictions_data["predictions"]]
-        pred_confs = [item['score'] for item in predictions_data["predictions"]]
+        pred_mask = [
+            mask_util.decode(item["segmentation"])
+            for item in predictions_data["predictions"]
+        ]
+        pred_labels = [
+            item["category_name"] for item in predictions_data["predictions"]
+        ]
+        pred_confs = [item["score"] for item in predictions_data["predictions"]]
 
         # Generate segmented images
-        gt_img, gt_mask = plot.segment(img, gt_masks, gt_labels, ret=True, bbox_flag=bbox , segment_type=segment_type)
-        pred_img, pred_mask = plot.segment(img, pred_mask, pred_labels, confs=pred_confs, ret=True, bbox_flag=bbox,segment_type=segment_type)
+        gt_img, gt_mask = plot.segment(
+            img,
+            gt_masks,
+            gt_labels,
+            ret=True,
+            bbox_flag=bbox,
+            segment_type=segment_type,
+        )
+        pred_img, pred_mask = plot.segment(
+            img,
+            pred_mask,
+            pred_labels,
+            confs=pred_confs,
+            ret=True,
+            bbox_flag=bbox,
+            segment_type=segment_type,
+        )
 
         # Collect images to display based on the boolean flags
         images_to_plot = {}
@@ -101,15 +133,19 @@ class Image:
         if images_to_plot:
             plot.image(**images_to_plot)
 
-
-
-        
     def check_ann(self):
         pass
 
-    def get_stats(self ,iou_thresh=0.5, conf_thresh=[0.5],mode="conf", level="instance",tabulate=False):
+    def get_stats(
+        self,
+        iou_thresh: float = 0.5,
+        conf_thresh: list = [0.5],
+        mode="conf",
+        level="instance",
+        tabulate=False,
+    ):
         """
-        Evaluates object segmentation performance for a single image by computing statistics such as 
+        Evaluates object segmentation performance for a single image by computing statistics such as
         precision, recall, F1-score, and IoU at different confidence thresholds.
 
         Args:
@@ -131,15 +167,15 @@ class Image:
         if mode == "iou":
             assert len(iou_thresh) > 0, "Please provide IoU thresholds"
 
-        assert level in ["instance", "pixel"], "Level must be either 'instance' or 'pixel'"
+        assert level in [
+            "instance",
+            "pixel",
+        ], "Level must be either 'instance' or 'pixel'"
 
-
-
-        gt_label , predictions = self.load_json()
+        gt_label, predictions = self.load_json()
 
         self.filename = Path(gt_label["image_path"]).name
         self.img_path = gt_label["image_path"]
-
 
         # self.img_path = gt_label[0]["img_path"]
         # filename = Path(gt_label[0]["img_path"]).name
@@ -153,31 +189,66 @@ class Image:
 
         for conf in conf_thresh:
             class_wise_stats = {}
-            filtered_pred = [item for item in predictions["predictions"] if item["score"] >= conf]
+            filtered_pred = [
+                item for item in predictions["predictions"] if item["score"] >= conf
+            ]
             # pred_classes = set([item['category_name'] for item in filtered_pred])
             pred_classes = set(item["category_name"] for item in filtered_pred)
             unique_classes = gt_classes.union(pred_classes)
-            
+
             for class_name in unique_classes:
                 # filtered_class_pred = [item for item in filtered_pred if item['category_name'] == class_name]
-                filtered_class_pred = [item for item in filtered_pred if item["category_name"] == class_name]
-                filtered_gt = [item for item in gt_label["annotations"] if item["label"] == class_name]
+                filtered_class_pred = [
+                    item
+                    for item in filtered_pred
+                    if item["category_name"] == class_name
+                ]
+                filtered_gt = [
+                    item
+                    for item in gt_label["annotations"]
+                    if item["label"] == class_name
+                ]
 
-                filtered_gt_masks = [mask_util.decode(item['segmentation']) for item in filtered_gt]
+                filtered_gt_masks = [
+                    mask_util.decode(item["segmentation"]) for item in filtered_gt
+                ]
 
-                filtered_pred_masks = [mask_util.decode(item['segmentation']) for item in filtered_class_pred]
+                filtered_pred_masks = [
+                    mask_util.decode(item["segmentation"])
+                    for item in filtered_class_pred
+                ]
 
                 if level == "instance":
-                    tp, fp, fn, tn = self.check_iou(filtered_gt_masks, 
-                                            filtered_pred_masks, 
-                                            iou_th=iou_thresh)
+                    tp, fp, fn, tn = self.check_iou(
+                        filtered_gt_masks, filtered_pred_masks, iou_th=iou_thresh
+                    )
 
-                    iou = self.get_iou(np.logical_or.reduce(filtered_gt_masks) if filtered_gt else np.zeros((self.height, self.width), dtype=np.uint8),
-                                np.logical_or.reduce(filtered_pred_masks) if filtered_class_pred else np.zeros((self.height, self.width), dtype=np.uint8))
-        
-                    tp, fp, fn, tn ,iou= self.check_pixel_iou(np.logical_or.reduce(filtered_gt_masks) if filtered_gt else np.zeros((self.height, self.width), dtype=np.uint8),
-                                                    np.logical_or.reduce(filtered_pred_masks) if filtered_class_pred else np.zeros((self.height, self.width), dtype=np.uint8),
-                                                    iou_th=iou_thresh)
+                    iou = self.get_iou(
+                        (
+                            np.logical_or.reduce(filtered_gt_masks)
+                            if filtered_gt
+                            else np.zeros((self.height, self.width), dtype=np.uint8)
+                        ),
+                        (
+                            np.logical_or.reduce(filtered_pred_masks)
+                            if filtered_class_pred
+                            else np.zeros((self.height, self.width), dtype=np.uint8)
+                        ),
+                    )
+
+                    tp, fp, fn, tn, iou = self.check_pixel_iou(
+                        (
+                            np.logical_or.reduce(filtered_gt_masks)
+                            if filtered_gt
+                            else np.zeros((self.height, self.width), dtype=np.uint8)
+                        ),
+                        (
+                            np.logical_or.reduce(filtered_pred_masks)
+                            if filtered_class_pred
+                            else np.zeros((self.height, self.width), dtype=np.uint8)
+                        ),
+                        iou_th=iou_thresh,
+                    )
 
                 class_wise_stats[class_name] = {
                     "tp": tp,
@@ -185,52 +256,53 @@ class Image:
                     "fn": fn,
                     "tn": tn,
                     "iou": iou,
-                    "gt": len(filtered_gt)
+                    "gt": len(filtered_gt),
                 }
 
             if class_wise_stats:
-                f1, precision, recall, miou = self.calculate_image_level_metric(class_wise_stats)
+                f1, precision, recall, miou = self.calculate_image_level_metric(
+                    class_wise_stats
+                )
                 results[conf] = {
-                    'filename': self.filename,
-                    'f1': f1,
-                    'precision': precision,
-                    'recall': recall,
-                    'miou': miou,
-                    'class_stats': class_wise_stats
+                    "filename": self.filename,
+                    "f1": f1,
+                    "precision": precision,
+                    "recall": recall,
+                    "miou": miou,
+                    "class_stats": class_wise_stats,
                 }
             else:
                 results[conf] = {
-                    'filename': self.filename,
-                    'f1': 1.0,
-                    'precision': 1.0,
-                    'recall': 1.0,
-                    'miou': 1.0,
-                    'class_stats': class_wise_stats
+                    "filename": self.filename,
+                    "f1": 1.0,
+                    "precision": 1.0,
+                    "recall": 1.0,
+                    "miou": 1.0,
+                    "class_stats": class_wise_stats,
                 }
             self.precision[conf] = precision
             self.recall[conf] = recall
             self.f1_score[conf] = f1
             self.miou[conf] = miou
-            
+
         self.results = results
 
-        if tabulate==True:
+        if tabulate == True:
             print(generate_classwise_tabulated_stats(results))
-        
+
         return self
-    
 
     def load_json(self):
-        if self.anno_path and  self.pred_path is None:
-                raise ValueError("jsons paths are not set.")
-        with open(self.anno_path ,"r") as raw_gt:
+        if self.anno_path and self.pred_path is None:
+            raise ValueError("jsons paths are not set.")
+        with open(self.anno_path, "r") as raw_gt:
             gt = json.load(raw_gt)
-        with open(self.pred_path ,"r") as raw_pred:
+        with open(self.pred_path, "r") as raw_pred:
             pred = json.load(raw_pred)
 
-        return gt , pred
-    
-    def get_iou(self,mask1, mask2):
+        return gt, pred
+
+    def get_iou(self, mask1, mask2):
         inter = np.logical_and(mask1, mask2)
         union = np.logical_or(mask1, mask2)
         if np.sum(union) == 0:
@@ -238,28 +310,25 @@ class Image:
         iou = np.sum(inter) / np.sum(union)
         return iou
 
-    def check_pixel_iou(self,gt_mask, pred_mask, iou_th=0.3):
+    def check_pixel_iou(self, gt_mask, pred_mask, iou_th=0.3):
         """
         Compute TP, FP, FN, and TN at the pixel level for segmentation masks.
-        
+
         :param gt_mask: Binary 2D numpy array (ground truth mask)
         :param pred_mask: Binary 2D numpy array (predicted mask)
         :param iou_th: IoU threshold for determining matches (default = 0.3)
-        :return: TP, FP, FN, TN 
+        :return: TP, FP, FN, TN
         """
         iou = self.get_iou(gt_mask, pred_mask)
-        
+
         tp = np.sum((pred_mask == 1) & (gt_mask == 1))
         fp = np.sum((pred_mask == 1) & (gt_mask == 0))
         tn = np.sum((pred_mask == 0) & (gt_mask == 0))
         fn = np.sum((pred_mask == 0) & (gt_mask == 1))
-        
-        
-        return tp, fp, fn, tn , iou
 
+        return tp, fp, fn, tn, iou
 
-
-    def check_iou(self ,gt_masks, pred_masks, iou_th=0.3):
+    def check_iou(self, gt_masks, pred_masks, iou_th=0.3):
         tp, fp, fn, tn = 0, 0, 0, 0
         matches = {}
         for p_idx, p_mask in enumerate(pred_masks):
@@ -270,17 +339,18 @@ class Image:
                         matches[p_idx] = [g_idx]
                     else:
                         matches[p_idx].append(g_idx)
-        
+
         tp = len(matches)
         fp = len(pred_masks) - len(set(list(matches.keys())))
-        fn = len(gt_masks) - len(set([item for sublist in list(matches.values()) for item in sublist]))
+        fn = len(gt_masks) - len(
+            set([item for sublist in list(matches.values()) for item in sublist])
+        )
         return tp, fp, fn, tn
 
-
     def calculate_image_level_metric(self, class_wise_stats):
-        tp = sum([item['tp'] for item in class_wise_stats.values()])
-        fp = sum([item['fp'] for item in class_wise_stats.values()])
-        fn = sum([item['fn'] for item in class_wise_stats.values()])
+        tp = sum([item["tp"] for item in class_wise_stats.values()])
+        fp = sum([item["fp"] for item in class_wise_stats.values()])
+        fn = sum([item["fn"] for item in class_wise_stats.values()])
 
         if tp + fp == 0:
             precision = 0
@@ -294,14 +364,15 @@ class Image:
             f1 = 0
         else:
             f1 = 2 * precision * recall / (precision + recall)
-        miou = np.mean([item['iou'] for item in class_wise_stats.values()])
+        miou = np.mean([item["iou"] for item in class_wise_stats.values()])
         return f1, precision, recall, miou
 
 
 import time
 
+
 class DatasetStats:
-    def __init__(self, gt_file_paths, pred_file_paths):
+    def __init__(self, gt_file_paths: list, pred_file_paths: list):
         self.gt_file_paths = gt_file_paths
         self.pred_file_paths = pred_file_paths
         self.all_image_stats = {}
@@ -323,7 +394,9 @@ class DatasetStats:
         """
         self.conf_thresh = conf_thresh
         if len(self.gt_file_paths) != len(self.pred_file_paths):
-            raise ValueError("Mismatch in the number of ground truth files and prediction files.")
+            raise ValueError(
+                "Mismatch in the number of ground truth files and prediction files."
+            )
 
         all_class_stats = []
         lock = threading.Lock()
@@ -333,8 +406,10 @@ class DatasetStats:
             """
             Process a single file pair and compute statistics.
             """
-            img_obj = Image(gt_path, pred_path).get_stats(conf_thresh=conf_thresh, iou_thresh=iou_thresh)
-            
+            img_obj = Image(gt_path, pred_path).get_stats(
+                conf_thresh=conf_thresh, iou_thresh=iou_thresh
+            )
+
             with lock:
                 filename = Path(img_obj.img_path).name
                 if filename in self.all_image_stats:
@@ -347,13 +422,22 @@ class DatasetStats:
         # Use joblib for parallel processing with tqdm for progress tracking
         with tqdm(total=len(self.gt_file_paths), desc="Processing files") as pbar:
             Parallel(n_jobs=-1, backend="threading")(
-                delayed(lambda x: (process_file(*x), pbar.update(1)))((gt_path, pred_path))
+                delayed(lambda x: (process_file(*x), pbar.update(1)))(
+                    (gt_path, pred_path)
+                )
                 for gt_path, pred_path in zip(self.gt_file_paths, self.pred_file_paths)
             )
 
         # Convert dataset to COCO format for mAP calculation
-        coco_gtr, label_mapping = transform_to_coco(self.gt_file_paths, task="segmentation", is_gt=True)
-        coco_pred = transform_to_coco(self.pred_file_paths, task="segmentation", is_gt=False, label_mapping=label_mapping)
+        coco_gtr, label_mapping = transform_to_coco(
+            self.gt_file_paths, task="segmentation", is_gt=True
+        )
+        coco_pred = transform_to_coco(
+            self.pred_file_paths,
+            task="segmentation",
+            is_gt=False,
+            label_mapping=label_mapping,
+        )
 
         # Initialize COCO object and load predictions
         with contextlib.redirect_stdout(io.StringIO()):
@@ -379,15 +463,16 @@ class DatasetStats:
         elapsed_time = time.time() - start_time
         print(f"Total time taken: {elapsed_time:.2f} seconds")
 
-
         # Convert class-level and overall metrics into DataFrames
         self.class_vise_res_df = class_metric_to_df(class_wise_stats)
         self.overall_res_df = overall_metric_to_df(dataset_stats)
         self.mAP_df = mAP_df
 
         return self
-    
-    def filter(self, by="f1_score", thresh=0.5, eq="<", conf_thresh=None):
+
+    def filter(
+        self, by: str = "f1_score", thresh: float = 0.5, eq="<", conf_thresh=None
+    ):
         """
         Filter the dataset based on a specific metric and threshold.
 
@@ -419,16 +504,20 @@ class DatasetStats:
             for img_obj in img_list:
                 metric_value = getattr(img_obj, by, None)
                 if metric_value is None:
-                    raise ValueError(f"Invalid metric '{by}'. Available metrics are 'f1_score', 'precision', 'recall', 'miou'.")
+                    raise ValueError(
+                        f"Invalid metric '{by}'. Available metrics are 'f1_score', 'precision', 'recall', 'miou'."
+                    )
                 metric_value = metric_value[conf_thresh]
 
-                if (eq == "<" and metric_value < thresh) or \
-                (eq == "<=" and metric_value <= thresh) or \
-                (eq == ">" and metric_value > thresh) or \
-                (eq == ">=" and metric_value >= thresh) or \
-                (eq == "==" and metric_value == thresh):
+                if (
+                    (eq == "<" and metric_value < thresh)
+                    or (eq == "<=" and metric_value <= thresh)
+                    or (eq == ">" and metric_value > thresh)
+                    or (eq == ">=" and metric_value >= thresh)
+                    or (eq == "==" and metric_value == thresh)
+                ):
                     filtered_imgs.append(img_obj)
-            
+
             if filtered_imgs:
                 new_image_stats[filename] = filtered_imgs
 
@@ -441,8 +530,17 @@ class DatasetStats:
 
         return filtered_dataset
 
-
-    def plot(self, samples=3, bbox=True, segment_type = "both", original_image=False, ground_truth_mask=False, ground_truth=True, pred_mask=False, predictions=True):
+    def plot(
+        self,
+        samples=3,
+        bbox=True,
+        segment_type="both",
+        original_image=False,
+        ground_truth_mask=False,
+        ground_truth=True,
+        pred_mask=False,
+        predictions=True,
+    ):
         """
         Visualizes ground truth and predicted bounding boxes for a subset of images.
 
@@ -461,13 +559,15 @@ class DatasetStats:
         Returns:
             None: Displays the selected images using their respective `plot()` methods.
         """
-        
+
         if not self.all_image_stats:
             print("No image statistics available to plot.")
             return
 
         # Flatten dictionary values into a single list of images
-        all_images = [img for img_list in self.all_image_stats.values() for img in img_list]
+        all_images = [
+            img for img_list in self.all_image_stats.values() for img in img_list
+        ]
 
         # Select random images if samples < total available images
         selected_images = random.sample(all_images, min(samples, len(all_images)))
@@ -475,18 +575,19 @@ class DatasetStats:
         # Plot the selected images
         for i, img_obj in enumerate(selected_images, start=1):
             print(f"Plotting image {i}: {img_obj.img_path}")
-            img_obj.plot(bbox=bbox,
-                         segment_type = segment_type, 
-                        original_image=original_image, 
-                        ground_truth_masks=ground_truth_mask, 
-                        ground_truth=ground_truth, 
-                        pred_masks=pred_mask, 
-                        predictions=predictions)
-
+            img_obj.plot(
+                bbox=bbox,
+                segment_type=segment_type,
+                original_image=original_image,
+                ground_truth_masks=ground_truth_mask,
+                ground_truth=ground_truth,
+                pred_masks=pred_mask,
+                predictions=predictions,
+            )
 
     def __len__(self):
         return len(self.all_image_stats)
-    
+
     def plot_metric(self, metric_type="all"):
         """
         Plots the specified evaluation metric(s) against the confidence threshold.
@@ -505,23 +606,33 @@ class DatasetStats:
         Displays:
             A line plot of the selected metric(s) against confidence thresholds.
         """
-    
-        assert metric_type in ["f1_score", "recall", "precision", "all"], \
-            f"Provide the metric_type among ['f1_score', 'recall', 'precision', 'all']"
-        
+
+        assert metric_type in [
+            "f1_score",
+            "recall",
+            "precision",
+            "all",
+        ], f"Provide the metric_type among ['f1_score', 'recall', 'precision', 'all']"
+
         df = self.overall_res_df
         plt.figure(figsize=(8, 5))
-        
+
         if metric_type == "all":
-            plt.plot(df["conf"], df["precision"], marker='o', label='Precision')
-            plt.plot(df["conf"], df["recall"], marker='s', label='Recall')
-            plt.plot(df["conf"], df["f1_score"], marker='^', label='F1 Score')
+            plt.plot(df["conf"], df["precision"], marker="o", label="Precision")
+            plt.plot(df["conf"], df["recall"], marker="s", label="Recall")
+            plt.plot(df["conf"], df["f1_score"], marker="^", label="F1 Score")
         else:
-            plt.plot(df["conf"], df[metric_type], marker='o', label=metric_type.capitalize())
-        
+            plt.plot(
+                df["conf"], df[metric_type], marker="o", label=metric_type.capitalize()
+            )
+
         plt.xlabel("Confidence Threshold")
         plt.ylabel("Value")
-        plt.title(f"{metric_type.capitalize()} vs Confidence Threshold" if metric_type != "all" else "Metrics vs Confidence Threshold")
+        plt.title(
+            f"{metric_type.capitalize()} vs Confidence Threshold"
+            if metric_type != "all"
+            else "Metrics vs Confidence Threshold"
+        )
         plt.legend()
         plt.grid(True)
         plt.show()
@@ -530,19 +641,21 @@ class DatasetStats:
         """
         returns Dataframe of class wise stats on dataset
         """
-        assert self.class_vise_res_df is None , f"Plese use get_stats on the object first"
+        assert (
+            self.class_vise_res_df is None
+        ), f"Plese use get_stats on the object first"
         return self.class_vise_res_df
-    
+
     def get_dataset_result(self):
         """
         returns Dataframe of  stats  on complete dataset
         """
-        assert self.overall_res_df is None , f"Plese use get_stats on the object first"
+        assert self.overall_res_df is None, f"Plese use get_stats on the object first"
         return self.overall_res_df
-    
+
     def get_mAP_result(self):
         """
         returns Dataframe of mAP stats on dataset
         """
-        assert self.mAP_df is None , f"Plese use get_stats on the object first"
+        assert self.mAP_df is None, f"Plese use get_stats on the object first"
         return self.mAP_df

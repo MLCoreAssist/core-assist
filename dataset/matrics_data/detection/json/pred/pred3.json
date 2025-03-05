@@ -1,0 +1,11 @@
+{"image_path" : "../dataset/matrics_data/detection/images/IMG_2645.JPG",
+    "image_name":"IMG_2645",
+    "height":1024,
+    "width" :1024,
+    "predictions":[   
+    {"image_id": 1,"bbox": [62, 62, 140, 140], "label": "cat", "score": 0.9},
+    {"image_id": 1,"bbox": [212, 122, 290, 118], "label": "dog", "score": 0.85},
+    {"image_id": 1,"bbox": [305, 305, 445, 445], "label": "bird", "score": 0.75},
+    {"image_id": 1,"bbox": [365, 305, 445, 445], "label": "dog", "score": 0.75},
+    {"image_id": 1,"bbox": [375, 305, 445, 445], "label": "bird", "score": 0.75}
+]}
