@@ -1,0 +1,3 @@
+names: [cat, bird, dog]
+nc: 3
+train: /home/azureuser/cloudfiles/code/Users/rohit.chandra/scripts/cv_utility/examples/coco/images/train

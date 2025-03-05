@@ -1,35 +1,18 @@
-"""
-Computer Vision Utility Library - Dataset Base Classes
-
-This module provides base classes for handling computer vision datasets in various formats.
-It includes support for COCO-style annotations and segmentation masks.
-
-__author__: HashTagML
-license: MIT
-Created: Monday, 29th March 2021
-"""
-
 import os
-import warnings
-from typing import List, Union , Dict  , Optional
+from typing import Dict, List, Optional, Union
 
-import numpy as np
 import pandas as pd
-
-from core_assist.dataset.format import FormatSpec
-from core_assist.dataset.utils import exists, get_annotation_dir, get_image_dir, read_coco
 from joblib import Parallel, delayed
 from tqdm.auto import tqdm
 
 from core_assist.dataset.format import FormatSpec
-from core_assist.dataset.utils import exists, get_annotation_dir, get_image_dir
+from core_assist.dataset.utils import get_annotation_dir, get_image_dir
+
 NUM_THREADS = os.cpu_count() // 2
+import json
 from functools import partial
 from pathlib import Path
-from typing import Dict 
-import json
-
-
+from typing import Dict, List, Optional, Union
 
 
 class Base(FormatSpec):
@@ -62,7 +45,7 @@ class Base(FormatSpec):
                     |   │   ...
                     |   └── n.json
                     ├── valid(...)
-                    └── test(...)   
+                    └── test(...)
 
             or,
 
@@ -78,27 +61,30 @@ class Base(FormatSpec):
                 └── annotations
                     ├── 1.json
                     ├── 2.json
-                    │   ... 
+                    │   ...
                     └── n.json
-        
+
         format (Optional[str]): Format specification for the dataset. Defaults to None.
     """
+
     def __init__(self, root: Union[str, os.PathLike], format: Optional[str] = None):
         super().__init__(root, format=format)  # Pass `format` to parent class
         self._image_dir = get_image_dir(root)
         self._annotation_dir = get_annotation_dir(root)
         assert os.path.exists(self._image_dir), "root is missing `images` directory."
-        assert os.path.exists(self._annotation_dir), "root is missing `annotations` directory."
-        
+        assert os.path.exists(
+            self._annotation_dir
+        ), "root is missing `annotations` directory."
+
         self._find_splits()
         self._resolve_dataframe()
 
     def _get_class_map(self, categories: List):
         """Creates a mapping from category names to unique class IDs.
-        
+
         Args:
             categories (List): List of category names
-            
+
         Returns:
             Dict: Mapping from category name to integer class ID
         """
@@ -107,7 +93,7 @@ class Base(FormatSpec):
 
     def _resolve_dataframe(self):
         """Processes all annotations into a unified pandas DataFrame.
-        
+
         Creates a master DataFrame containing all annotations across splits with standardized
         column names and data types. Handles parallel processing of annotation files for improved
         performance.
@@ -129,15 +115,24 @@ class Base(FormatSpec):
 
         print("Loading COCO annotations:")
         for split in self._splits:
-            image_ids, image_paths, class_ids, x_mins, y_mins, bbox_widths, bbox_heights, image_heights, image_widths = (
-                [], [], [], [], [], [], [], [], []
-            )
+            (
+                image_ids,
+                image_paths,
+                class_ids,
+                x_mins,
+                y_mins,
+                bbox_widths,
+                bbox_heights,
+                image_heights,
+                image_widths,
+            ) = ([], [], [], [], [], [], [], [], [])
             split = split if self._has_image_split else ""
             annotations = Path(self._annotation_dir).joinpath(split).glob("*.json")
-            
+
             parse_partial = partial(self._parse_json_file, split)
             all_instances = Parallel(n_jobs=NUM_THREADS, backend="multiprocessing")(
-                delayed(parse_partial)(json_file) for json_file in tqdm(annotations, desc=split)
+                delayed(parse_partial)(json_file)
+                for json_file in tqdm(annotations, desc=split)
             )
 
             for instances in all_instances:
@@ -207,21 +202,21 @@ class Base(FormatSpec):
             "image_widths",
         ]
         label_info = {key: [] for key in label_info_keys}
-        
+
         with open(json_path, "r") as f:
             data = json.load(f)
-            
+
         image_path = data.get("image_path", "")
         image_name = data.get("image_name", "")
         image_width = data.get("width", 0)
         image_height = data.get("height", 0)
-        
+
         for annotation in data.get("annotations", []):
             label = annotation["label"]
             x_min, y_min, x_max, y_max = annotation["bbox"]
             width = x_max - x_min
             height = y_max - y_min
-            
+
             label_info["image_ids"].append(image_name)
             label_info["image_paths"].append(image_path)
             label_info["class_ids"].append(label)
@@ -231,22 +226,13 @@ class Base(FormatSpec):
             label_info["bbox_heights"].append(height)
             label_info["image_widths"].append(image_width)
             label_info["image_heights"].append(image_height)
-        
+
         return label_info
 
 
-import os
-import warnings
-from typing import List, Union, Dict, Optional
-import numpy as np
-import pandas as pd
-from pathlib import Path
-import json
-from pycocotools import mask as mask_utils
-
 class SegmentationBase(Base):
     """Extended base class for handling COCO-style segmentation annotations.
-    
+
     This class extends the Base class to specifically handle segmentation masks in COCO RLE format.
     It maintains the same directory structure expectations as the Base class but processes
     segmentation annotations instead of bounding boxes.
@@ -255,20 +241,22 @@ class SegmentationBase(Base):
         root (Union[str, os.PathLike]): Path to dataset root directory
         format (Optional[str]): Format specification for the dataset. Defaults to None.
     """
-    
+
     def __init__(self, root: Union[str, os.PathLike], format: Optional[str] = None):
         super().__init__(root, format=format)  # Pass `format` to parent class
         self._image_dir = get_image_dir(root)
         self._annotation_dir = get_annotation_dir(root)
         assert os.path.exists(self._image_dir), "root is missing `images` directory."
-        assert os.path.exists(self._annotation_dir), "root is missing `annotations` directory."
-        
+        assert os.path.exists(
+            self._annotation_dir
+        ), "root is missing `annotations` directory."
+
         self._find_splits()
         self._resolve_dataframe()
-    
+
     def _resolve_dataframe(self):
         """Override of Base._resolve_dataframe to handle segmentation data.
-        
+
         Creates a master DataFrame specifically structured for segmentation annotations,
         including RLE-encoded mask data.
         """
@@ -288,13 +276,14 @@ class SegmentationBase(Base):
         for split in self._splits:
             image_ids, image_paths, categories, segmentations = [], [], [], []
             image_heights, image_widths = [], []
-            
+
             split = split if self._has_image_split else ""
             annotations = Path(self._annotation_dir).joinpath(split).glob("*.json")
-            
+
             parse_partial = partial(self._parse_json_file, split)
             all_instances = Parallel(n_jobs=NUM_THREADS, backend="multiprocessing")(
-                delayed(parse_partial)(json_file) for json_file in tqdm(annotations, desc=split)
+                delayed(parse_partial)(json_file)
+                for json_file in tqdm(annotations, desc=split)
             )
 
             for instances in all_instances:
@@ -351,24 +340,24 @@ class SegmentationBase(Base):
             "image_heights": [],
             "image_widths": [],
         }
-        
+
         with open(json_path, "r") as f:
             data = json.load(f)
-            
+
         image_path = data.get("image_path", "")
         image_name = data.get("image_name", "")
         image_width = data.get("width", 0)
         image_height = data.get("height", 0)
-        
+
         for annotation in data.get("annotations", []):
             label = annotation["label"]
             segmentation = annotation["segmentation"]
-            
+
             label_info["image_ids"].append(image_name)
             label_info["image_paths"].append(image_path)
             label_info["categories"].append(label)
             label_info["segmentations"].append(segmentation)
             label_info["image_widths"].append(image_width)
             label_info["image_heights"].append(image_height)
-        
+
         return label_info

@@ -4,24 +4,18 @@ import warnings
 from random import shuffle
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import cv2
+import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 from pandas.api.types import is_numeric_dtype
 
-from core_assist.dataset.visual_utils import (
-    Resizer,
-    check_df_cols,
-    check_num_imgs,
-    check_save_path,
-    get_class_color_map,
-    plot_boxes,
-    render_grid_mpl,
-    render_grid_mpy,
-    render_grid_pil,
-)
-from core_assist.plot import bbox , segment
-import numpy as np
-import cv2
+from core_assist.dataset.visual_utils import (Resizer, check_df_cols,
+                                              check_num_imgs, check_save_path,
+                                              get_class_color_map, plot_boxes,
+                                              render_grid_mpl, render_grid_mpy,
+                                              render_grid_pil)
+from core_assist.plot import bbox
 
 
 class Visualizer:
@@ -48,9 +42,19 @@ class Visualizer:
     ):
         # Check images dir and dataframe
         if ".csv" not in str(images_dir):
-            assert os.path.exists(images_dir), f"Path {images_dir} does not exist. Please check."
+            assert os.path.exists(
+                images_dir
+            ), f"Path {images_dir} does not exist. Please check."
         # assert check_num_imgs(images_dir), f"No images found in {(images_dir)}, Please check."
-        req_cols = ["image_id", "x_min", "y_min", "width", "height", "category", "class_id"]
+        req_cols = [
+            "image_id",
+            "x_min",
+            "y_min",
+            "width",
+            "height",
+            "category",
+            "class_id",
+        ]
         assert check_df_cols(
             dataframe.columns.to_list(), req_cols=req_cols
         ), f"Some required columns are not present in the dataframe.\
@@ -60,9 +64,14 @@ class Visualizer:
         self.images_dir = images_dir
         self.resize = (img_size, img_size)
         self.original_df = dataframe.copy()
-        if kwargs.get("threshold", None) is not None and "score" in self.original_df.columns:
+        if (
+            kwargs.get("threshold", None) is not None
+            and "score" in self.original_df.columns
+        ):
             threshold = kwargs.get("threshold")
-            assert threshold > 0 and threshold <= 1, f"Threshold shoule be between [0.,1.],but received {threshold}"
+            assert (
+                threshold > 0 and threshold <= 1
+            ), f"Threshold shoule be between [0.,1.],but received {threshold}"
             self.original_df = self.original_df.query("score >= @threshold")
         if split is not None:
             self.original_df = self.original_df.query("split == @split")
@@ -75,7 +84,8 @@ class Visualizer:
 
         # Initialize class map and color class map.
         self.class_map = pd.Series(
-            self.original_df.class_id.values.astype(int), index=self.original_df.category
+            self.original_df.class_id.values.astype(int),
+            index=self.original_df.category,
         ).to_dict()
         self.class_map = {v: k for k, v in self.class_map.items()}
         self.class_color_map = get_class_color_map(self.class_map)
@@ -101,10 +111,23 @@ class Visualizer:
         scores = []
         for row in img_df.to_dict("records"):
             is_valid_row = is_numeric_dtype(
-                pd.Series([row["x_min"], row["y_min"], row["width"], row["height"], row["class_id"]])
+                pd.Series(
+                    [
+                        row["x_min"],
+                        row["y_min"],
+                        row["width"],
+                        row["height"],
+                        row["class_id"],
+                    ]
+                )
             )
             if is_valid_row:
-                box = [row["x_min"], row["y_min"], row["x_min"] + row["width"], row["y_min"] + row["height"]]
+                box = [
+                    row["x_min"],
+                    row["y_min"],
+                    row["x_min"] + row["width"],
+                    row["y_min"] + row["height"],
+                ]
                 img_bboxes.append(box + [row["class_id"]])
                 if "score" in row.keys():
                     scores.append(row["score"])
@@ -142,13 +165,19 @@ class Visualizer:
         Returns:
             List[Dict]: List of images and annotations info.
         """
-        self.filtered_df = self._apply_filters(**kwargs) if do_filter else self.filtered_df
+        self.filtered_df = (
+            self._apply_filters(**kwargs) if do_filter else self.filtered_df
+        )
         unique_images = list(self.filtered_df.image_id.unique())
         use_original = kwargs.get("use_original", False)
         batch_img_indices = []
 
         if samples == -1:
-            batch_img_indices = list(self.original_df.image_id.unique()) if use_original else unique_images
+            batch_img_indices = (
+                list(self.original_df.image_id.unique())
+                if use_original
+                else unique_images
+            )
 
         elif index is not None or name is not None:
             unique_images_original = list(self.original_df.image_id.unique())
@@ -214,7 +243,9 @@ class Visualizer:
             do_filter = True
             if kwargs == self.previous_args:
                 do_filter = False
-            batch = self._get_batch(samples, random=random, do_filter=do_filter, **kwargs)
+            batch = self._get_batch(
+                samples, random=random, do_filter=do_filter, **kwargs
+            )
             self.previous_batch = batch
             self.previous_args = kwargs
 
@@ -230,7 +261,9 @@ class Visualizer:
             return drawn_imgs[0]
 
         if len(drawn_imgs) > 0:
-            return self._render_image_grid(samples, drawn_imgs, image_names, render, **kwargs)
+            return self._render_image_grid(
+                samples, drawn_imgs, image_names, render, **kwargs
+            )
         else:
             warnings.warn("No valid images found to visualize.")
             return
@@ -272,13 +305,33 @@ class Visualizer:
         cols = 1 if samples == 1 else cols
         rows = math.ceil(samples / cols)
         if render.lower() == "mpl":
-            render_grid_mpl(drawn_imgs, image_names, samples, cols, rows, self.resize[0], save_path, **kwargs)
+            render_grid_mpl(
+                drawn_imgs,
+                image_names,
+                samples,
+                cols,
+                rows,
+                self.resize[0],
+                save_path,
+                **kwargs,
+            )
         elif render.lower() == "pil":
-            return render_grid_pil(drawn_imgs, image_names, samples, cols, rows, self.resize[0], save_path, **kwargs)
+            return render_grid_pil(
+                drawn_imgs,
+                image_names,
+                samples,
+                cols,
+                rows,
+                self.resize[0],
+                save_path,
+                **kwargs,
+            )
         elif render.lower() == "mpy":
             return render_grid_mpy(drawn_imgs, image_names, **kwargs)
         else:
-            raise RuntimeError("Invalid Image grid rendering format, should be either mpl or pil.")
+            raise RuntimeError(
+                "Invalid Image grid rendering format, should be either mpl or pil."
+            )
 
     def _draw_images(self, batch: List[Dict], **kwargs) -> Tuple[List, List]:
         """Draws annotations on the images.
@@ -293,20 +346,20 @@ class Visualizer:
         image_names = []
         for img_ann_info in batch:
             img_name = img_ann_info["img"]["image_name"]
-            # print(img_name)
+
             img = img_ann_info["img"]["image"]
             anns = img_ann_info["anns"]
             scores = img_ann_info.get("scores", None)
-            # print(self.class_map)
-            # print([self.class_map[i] for i in anns[:,-1]])
-            # print([self.class_map[i] for i in anns[:][-1]])
+
             try:
                 drawn_img = bbox(
-                    img =np.array(img), bboxes=anns[:,:4], labels=[self.class_map[i] for i in anns[:,-1]],ret=True,**kwargs
+                    img=np.array(img),
+                    bboxes=anns[:, :4],
+                    labels=[self.class_map[i] for i in anns[:, -1]],
+                    ret=True,
+                    **kwargs,
                 )
-                # drawn_img = plot_boxes(
-                #     img, anns, scores, class_map=self.class_map, class_color_map=self.class_color_map, **kwargs
-                # )
+
                 image_names.append(img_name)
                 drawn_imgs.append(drawn_img)
             except Exception as e:
@@ -327,21 +380,29 @@ class Visualizer:
             pd.DataFrame: Filtered dataframe.
         """
         if kwargs.get("only_without_labels", None):
-            df = self.original_df[self.df["class_id"].isna() & self.df["category"].isna()]
+            df = self.original_df[
+                self.df["class_id"].isna() & self.df["category"].isna()
+            ]
             return df
         curr_df = self.original_df.copy()
         if kwargs.get("only_with_labels", None):
             curr_df = self.original_df.dropna(axis=0)
         if kwargs.get("filter_categories", None):
             filter_labels = kwargs["filter_categories"]
-            ds_classes = [cat.lower() for cat in list(self.original_df.category.unique())]
+            ds_classes = [
+                cat.lower() for cat in list(self.original_df.category.unique())
+            ]
             labels = []
             if len(filter_labels) > 0:
-                labels = [filter_labels] if isinstance(filter_labels, str) else filter_labels
+                labels = (
+                    [filter_labels] if isinstance(filter_labels, str) else filter_labels
+                )
                 labels = [cat.lower() for cat in labels]
                 for label in labels:
                     if label not in ds_classes:
-                        warnings.warn(f"{label} category is not present in the dataset. Please check")
+                        warnings.warn(
+                            f"{label} category is not present in the dataset. Please check"
+                        )
             if len(labels) > 0:
                 curr_df = curr_df[curr_df["category"].str.lower().isin(labels)]
         return curr_df
@@ -385,7 +446,7 @@ class Visualizer:
             warnings.warn("No valid images found to visualize.")
             return
 
-    def show_video(self,samples = 5 , use_original: bool = True, **kwargs) -> Any:
+    def show_video(self, samples=5, use_original: bool = True, **kwargs) -> Any:
         """Displays whole dataset as a video.
 
         Args:
@@ -405,9 +466,9 @@ class Visualizer:
         drawn_imgs, image_names = self._draw_images(batch, **kwargs)
 
         if len(drawn_imgs) > 0:
-            return self._render_image_grid(len(drawn_imgs), drawn_imgs, image_names, render="mpy", **kwargs)
+            return self._render_image_grid(
+                len(drawn_imgs), drawn_imgs, image_names, render="mpy", **kwargs
+            )
         else:
             warnings.warn("No valid images found to visualize.")
             return
-        
-

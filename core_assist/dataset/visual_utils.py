@@ -1,15 +1,10 @@
-"""
-__author__: HashTagML
-license: MIT
-Created: Thursday, 8th April 2021
-"""
 import collections
 import copy
 import os
 import random
 import textwrap
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union, Any
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import bounding_box.bounding_box as bb
 import matplotlib.pyplot as plt
@@ -17,8 +12,6 @@ import mediapy as media
 import numpy as np
 from mpl_toolkits.axes_grid1 import ImageGrid
 from PIL import Image, ImageDraw, ImageOps
-
-
 
 IMAGE_EXT = [".JPG", ".jpg", ".JPEG", ".jpeg", ".PNG", ".png"]
 IMAGE_BORDER = 30
@@ -38,6 +31,7 @@ COLORS = [
     "black",
     "silver",
 ]
+
 
 def check_num_imgs(images_dir: Union[str, os.PathLike]) -> int:
     """Checks number of images in given directory"""
@@ -82,7 +76,7 @@ class Resizer(object):
         return img, bboxes
 
     def _set_letterbox_dims(self):
-        """ Get letterbox resize dimensions of the images."""
+        """Get letterbox resize dimensions of the images."""
         iw, ih = self.orig_dim
         ew, eh = self.expected_size
 
@@ -163,7 +157,9 @@ def plot_boxes(
         else:
             category = box[-1]
         if kwargs.get("truncate_label", None) is not None:
-            category = "".join([cat[0].lower() for cat in category.split(kwargs.get("truncate_label"))])
+            category = "".join(
+                [cat[0].lower() for cat in category.split(kwargs.get("truncate_label"))]
+            )
         if scores is not None:
             category = category + ":" + str(round(scores[i], 2))
         color = class_color_map.get(int(box[-1]), "green")
@@ -260,15 +256,22 @@ def render_grid_mpy(drawn_imgs: List, image_names: List, **kwargs) -> Any:
         Any: IPython media object.
     """
     if kwargs.get("show_image_name", None):
-        drawn_imgs = [np.array(add_name_strip(img, name)) for img, name in zip(drawn_imgs, image_names)]
+        drawn_imgs = [
+            np.array(add_name_strip(img, name))
+            for img, name in zip(drawn_imgs, image_names)
+        ]
     else:
         drawn_imgs = [np.array(img) for img in drawn_imgs]
-    fps = 1 if kwargs.get("image_time", None) is None else 1 / kwargs.get("image_time", 1.0)
+    fps = (
+        1
+        if kwargs.get("image_time", None) is None
+        else 1 / kwargs.get("image_time", 1.0)
+    )
     return media.show_video(drawn_imgs, fps=fps)
 
 
 def add_name_strip(img: np.ndarray, name: str):
-    """ Adds name to image at the top."""
+    """Adds name to image at the top."""
     drawn_img = ImageOps.expand(img, border=IMAGE_BORDER, fill=(255, 255, 255))
     name = name.split("/")[-1]
     lines = textwrap.wrap(name, width=32)

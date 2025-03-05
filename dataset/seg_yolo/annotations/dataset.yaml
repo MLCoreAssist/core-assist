@@ -1,0 +1,3 @@
+names : [rhl,rdm,fs,b,fnp,fb,ldm,ol,lhl,lfw,rfd,rfl,rfb,lfl,lfb,rrg,rfg,rqg,rrh,rfh,rq,rb,rrw,rrt,rft,lff,rrp,lrp,g,feb,fwp,rfa,rra,rrr,an,lrr,rf,rff,rfw_ap,rrw_ap,rrd,rfw,fb_g,rtl,rsp,w_bt,rf_qg,lrd,lfd,lrw,lq,lft,fc,lrt,ltl,lsp,lfh,lrh,lfg,lrg,ddk,lfa,lra,ata,fps,fhc,rhw,lhw,rps]
+nc: 69
+train: /home/azureuser/cloudfiles/code/Users/rohit.chandra/scripts/cv_utility/examples/yolo_format/annotations/train

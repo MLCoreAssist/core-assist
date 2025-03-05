@@ -1,0 +1,5 @@
+img_path,anno_path,split
+../dataset/det_coco/images/train/Auction_A1_20221106_130911.png,../dataset/det_coco/annotations/train.json,train
+../dataset/det_coco/images/train/batch1_dent_img_000009.png,../dataset/det_coco/annotations/train.json,train
+../dataset/det_coco/images/train/gettyimages-1387151277-612x612.jpg,../dataset/det_coco/annotations/train.json,train
+../dataset/det_coco/images/train/IMG_2645.JPG,../dataset/det_coco/annotations/train.json,train

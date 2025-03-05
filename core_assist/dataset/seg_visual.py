@@ -1,19 +1,22 @@
-import os
 import math
+import os
 import warnings
+from random import shuffle
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import cv2
 import numpy as np
 import pandas as pd
-from typing import Union, Dict, List, Tuple, Optional, Any
-from pandas.api.types import is_numeric_dtype
-from random import shuffle
 from joblib import Parallel, delayed
-from core_assist.plot import segment
+from pandas.api.types import is_numeric_dtype
+from PIL import Image
 from pycocotools import mask as mask_utils
-from core_assist.dataset.visual_utils import (
-    render_grid_mpl,
-    render_grid_mpy,
-    render_grid_pil,
-)
+
+from core_assist.dataset.visual_utils import (render_grid_mpl, render_grid_mpy,
+                                              render_grid_pil)
+from core_assist.plot import segment
+
+
 class SegVisualizer:
     """Creates visualizer to visualize images with segmentation masks by batch size, name and index.
     Required dataframe of the dataset as input. Can show all images with segmentation masks as a video.
@@ -38,7 +41,9 @@ class SegVisualizer:
     ):
         # Check images dir and dataframe
         if ".csv" not in str(images_dir):
-            assert os.path.exists(images_dir), f"Path {images_dir} does not exist. Please check."
+            assert os.path.exists(
+                images_dir
+            ), f"Path {images_dir} does not exist. Please check."
         # assert check_num_imgs(images_dir), f"No images found in {(images_dir)}, Please check."
         req_cols = ["image_id", "segmentation", "category", "class_id"]
         self._check_df_cols(dataframe.columns.to_list(), req_cols=req_cols)
@@ -47,9 +52,14 @@ class SegVisualizer:
         self.images_dir = images_dir
         self.resize = (img_size, img_size)
         self.original_df = dataframe.copy()
-        if kwargs.get("threshold", None) is not None and "score" in self.original_df.columns:
+        if (
+            kwargs.get("threshold", None) is not None
+            and "score" in self.original_df.columns
+        ):
             threshold = kwargs.get("threshold")
-            assert threshold > 0 and threshold <= 1, f"Threshold should be between [0.,1.], but received {threshold}"
+            assert (
+                threshold > 0 and threshold <= 1
+            ), f"Threshold should be between [0.,1.], but received {threshold}"
             self.original_df = self.original_df.query("score >= @threshold")
         if split is not None:
             self.original_df = self.original_df.query("split == @split")
@@ -62,31 +72,34 @@ class SegVisualizer:
 
         # Initialize class map and color class map.
         self.class_map = pd.Series(
-            self.original_df.class_id.values.astype(int), index=self.original_df.category
+            self.original_df.class_id.values.astype(int),
+            index=self.original_df.category,
         ).to_dict()
         self.class_map = {v: k for k, v in self.class_map.items()}
         self.class_color_map = self._get_class_color_map(self.class_map)
         self.previous_batch = []
         self.previous_args = {}
-        
+
         # Initialize Resizer for maintaining image uniformity
         self.resizer = Resizer(self.resize)
-    
+
     def _check_df_cols(self, cols, req_cols):
         """Check if required columns are present in dataframe."""
         for col in req_cols:
             if col not in cols:
-                raise AssertionError(f"Some required columns are not present in the dataframe.\
-                Columns required for visualizing the segmentation are {','.join(req_cols)}.")
+                raise AssertionError(
+                    f"Some required columns are not present in the dataframe.\
+                Columns required for visualizing the segmentation are {','.join(req_cols)}."
+                )
         return True
-    
+
     def _get_class_color_map(self, class_map):
         """Generate color map for classes."""
         colors = {}
         for class_id in class_map:
             colors[class_id] = tuple(np.random.randint(0, 255, 3).tolist())
         return colors
-        
+
     def _decode_rle(self, rle, height, width):
         """Decode RLE encoding to binary mask."""
         if isinstance(rle, dict):
@@ -96,11 +109,11 @@ class SegVisualizer:
             if rle[0].isdigit():
                 # Convert COCO RLE format to mask
                 counts = [int(x) for x in rle.split()]
-                rle_dict = {'counts': counts, 'size': [height, width]}
+                rle_dict = {"counts": counts, "size": [height, width]}
                 return mask_utils.decode(rle_dict)
             else:
                 # Convert from other RLE format
-                binary_str = ''.join(['1' if i == 'T' else '0' for i in rle])
+                binary_str = "".join(["1" if i == "T" else "0" for i in rle])
                 binary_vals = [int(i) for i in binary_str]
                 return np.array(binary_vals).reshape(height, width)
         else:
@@ -121,36 +134,36 @@ class SegVisualizer:
             img_df = self.original_df[self.original_df["image_id"] == image_id]
         else:
             img_df = self.filtered_df[self.filtered_df["image_id"] == image_id]
-        
+
         image_path = None
         masks = []
         mask_labels = []
         scores = []
-        
+
         for row in img_df.to_dict("records"):
             is_valid_row = "segmentation" in row and row["segmentation"] is not None
-            
+
             if not image_path and "image_path" in row:
                 image_path = row["image_path"]
-            
+
             if is_valid_row:
                 # Store class label
                 mask_labels.append(self.class_map[row["class_id"]])
-                
+
                 # Handle RLE encoded segmentation
                 height = row.get("height", self.resize[0])
                 width = row.get("width", self.resize[1])
                 mask = self._decode_rle(row["segmentation"], height, width)
                 masks.append(mask)
-                
+
                 # Add score if available
                 if "score" in row:
                     scores.append(row["score"])
-        
+
         # Ensure we have an image path
         if not image_path:
             image_path = os.path.join(self.images_dir, image_id)
-        
+
         # Load and resize image
         try:
             img = self.resizer.load_image(image_path)
@@ -159,16 +172,16 @@ class SegVisualizer:
             for mask in masks:
                 resized_mask = self.resizer.resize_mask(mask)
                 resized_masks.append(resized_mask)
-            
+
             item = {
-                "img": {"image_name": image_path, "image": img}, 
+                "img": {"image_name": image_path, "image": img},
                 "masks": resized_masks,
-                "mask_labels": mask_labels
+                "mask_labels": mask_labels,
             }
-            
+
             if scores:
                 item["scores"] = scores
-                
+
             return item
         except Exception as e:
             warnings.warn(f"Error loading image {image_path}: {str(e)}")
@@ -198,13 +211,19 @@ class SegVisualizer:
         Returns:
             List[Dict]: List of images and segmentation info.
         """
-        self.filtered_df = self._apply_filters(**kwargs) if do_filter else self.filtered_df
+        self.filtered_df = (
+            self._apply_filters(**kwargs) if do_filter else self.filtered_df
+        )
         unique_images = list(self.filtered_df.image_id.unique())
         use_original = kwargs.get("use_original", False)
         batch_img_indices = []
 
         if samples == -1:
-            batch_img_indices = list(self.original_df.image_id.unique()) if use_original else unique_images
+            batch_img_indices = (
+                list(self.original_df.image_id.unique())
+                if use_original
+                else unique_images
+            )
 
         elif index is not None or name is not None:
             unique_images_original = list(self.original_df.image_id.unique())
@@ -270,7 +289,9 @@ class SegVisualizer:
             do_filter = True
             if kwargs == self.previous_args:
                 do_filter = False
-            batch = self._get_batch(samples, random=random, do_filter=do_filter, **kwargs)
+            batch = self._get_batch(
+                samples, random=random, do_filter=do_filter, **kwargs
+            )
             self.previous_batch = batch
             self.previous_args = kwargs
 
@@ -286,7 +307,9 @@ class SegVisualizer:
             return drawn_imgs[0]
 
         if len(drawn_imgs) > 0:
-            return self._render_image_grid(samples, drawn_imgs, image_names, render, save_path=save_path, **kwargs)
+            return self._render_image_grid(
+                samples, drawn_imgs, image_names, render, save_path=save_path, **kwargs
+            )
         else:
             warnings.warn("No valid images found to visualize.")
             return
@@ -336,13 +359,33 @@ class SegVisualizer:
         cols = 1 if samples == 1 else cols
         rows = math.ceil(samples / cols)
         if render.lower() == "mpl":
-            return render_grid_mpl(drawn_imgs, image_names, samples, cols, rows, self.resize[0], save_path, **kwargs)
+            return render_grid_mpl(
+                drawn_imgs,
+                image_names,
+                samples,
+                cols,
+                rows,
+                self.resize[0],
+                save_path,
+                **kwargs,
+            )
         elif render.lower() == "pil":
-            return render_grid_pil(drawn_imgs, image_names, samples, cols, rows, self.resize[0], save_path, **kwargs)
+            return render_grid_pil(
+                drawn_imgs,
+                image_names,
+                samples,
+                cols,
+                rows,
+                self.resize[0],
+                save_path,
+                **kwargs,
+            )
         elif render.lower() == "mpy":
             return render_grid_mpy(drawn_imgs, image_names, **kwargs)
         else:
-            raise RuntimeError("Invalid Image grid rendering format, should be either mpl or pil.")
+            raise RuntimeError(
+                "Invalid Image grid rendering format, should be either mpl or pil."
+            )
 
     def _draw_images(self, batch: List[Dict], **kwargs) -> Tuple[List, List]:
         """Draws segmentation masks on the images.
@@ -355,25 +398,25 @@ class SegVisualizer:
         """
         drawn_imgs = []
         image_names = []
-        
+
         # Get kwargs for segment function
         segment_kwargs = {
-            'bbox_flag': kwargs.get('bbox_flag', False),
-            'pad_bbox': kwargs.get('pad_bbox', 0.0),
-            'text_color': kwargs.get('text_color', (255, 255, 255)),
-            'thickness': kwargs.get('thickness', 2),
-            'font_scale': kwargs.get('font_scale', 1),
-            'segment_type': kwargs.get('segment_type', 'both'),
-            'ret': True
+            "bbox_flag": kwargs.get("bbox_flag", False),
+            "pad_bbox": kwargs.get("pad_bbox", 0.0),
+            "text_color": kwargs.get("text_color", (255, 255, 255)),
+            "thickness": kwargs.get("thickness", 2),
+            "font_scale": kwargs.get("font_scale", 1),
+            "segment_type": kwargs.get("segment_type", "both"),
+            "ret": True,
         }
-        
+
         for img_info in batch:
             img_name = img_info["img"]["image_name"]
             img = img_info["img"]["image"]
             masks = img_info["masks"]
             mask_labels = img_info["mask_labels"]
             scores = img_info.get("scores", None)
-            
+
             try:
                 # Use the provided segment function
                 drawn_img, _ = segment(
@@ -381,13 +424,15 @@ class SegVisualizer:
                     masks=masks,
                     mask_labels=mask_labels,
                     confs=scores,
-                    **segment_kwargs
+                    **segment_kwargs,
                 )
-                
+
                 image_names.append(img_name)
                 drawn_imgs.append(drawn_img)
             except Exception as e:
-                warnings.warn(f"Could not draw segmentation masks for {img_name}: {str(e)}")
+                warnings.warn(
+                    f"Could not draw segmentation masks for {img_name}: {str(e)}"
+                )
                 continue
 
         return drawn_imgs, image_names
@@ -404,29 +449,40 @@ class SegVisualizer:
             pd.DataFrame: Filtered dataframe.
         """
         if kwargs.get("only_without_labels", None):
-            df = self.original_df[self.original_df["class_id"].isna() & self.original_df["category"].isna()]
+            df = self.original_df[
+                self.original_df["class_id"].isna()
+                & self.original_df["category"].isna()
+            ]
             return df
-            
+
         curr_df = self.original_df.copy()
-        
+
         if kwargs.get("only_with_labels", None):
-            curr_df = self.original_df.dropna(subset=["segmentation", "class_id", "category"], how="any")
-            
+            curr_df = self.original_df.dropna(
+                subset=["segmentation", "class_id", "category"], how="any"
+            )
+
         if kwargs.get("filter_categories", None):
             filter_labels = kwargs["filter_categories"]
-            ds_classes = [cat.lower() for cat in list(self.original_df.category.unique())]
+            ds_classes = [
+                cat.lower() for cat in list(self.original_df.category.unique())
+            ]
             labels = []
-            
+
             if len(filter_labels) > 0:
-                labels = [filter_labels] if isinstance(filter_labels, str) else filter_labels
+                labels = (
+                    [filter_labels] if isinstance(filter_labels, str) else filter_labels
+                )
                 labels = [cat.lower() for cat in labels]
                 for label in labels:
                     if label not in ds_classes:
-                        warnings.warn(f"{label} category is not present in the dataset. Please check")
-                        
+                        warnings.warn(
+                            f"{label} category is not present in the dataset. Please check"
+                        )
+
             if len(labels) > 0:
                 curr_df = curr_df[curr_df["category"].str.lower().isin(labels)]
-                
+
         return curr_df
 
     def show_image(
@@ -468,7 +524,7 @@ class SegVisualizer:
             warnings.warn("No valid images found to visualize.")
             return
 
-    def show_video(self,samples=10, use_original: bool = True, **kwargs) -> Any:
+    def show_video(self, samples=10, use_original: bool = True, **kwargs) -> Any:
         """Displays whole dataset as a video.
 
         Args:
@@ -487,7 +543,9 @@ class SegVisualizer:
         drawn_imgs, image_names = self._draw_images(batch, **kwargs)
 
         if len(drawn_imgs) > 0:
-            return self._render_image_grid(len(drawn_imgs), drawn_imgs, image_names, render="mpy", **kwargs)
+            return self._render_image_grid(
+                len(drawn_imgs), drawn_imgs, image_names, render="mpy", **kwargs
+            )
         else:
             warnings.warn("No valid images found to visualize.")
             return
@@ -495,54 +553,49 @@ class SegVisualizer:
 
 class Resizer:
     """Utility class to resize images and masks to a fixed size."""
-    
+
     def __init__(self, size):
         """Initialize with target size."""
         self.size = size
-        
+
     def __call__(self, item):
         """Resize image and annotations in the item."""
         image_path = item.get("image_path")
         image = self.load_image(image_path)
-        
+
         if "anns" in item:
             anns = item["anns"]
             # Scale annotations here if needed
             return image, anns
-        
+
         return image
-    
+
     def load_image(self, image_path):
         """Load and resize an image."""
-        import cv2
-        from PIL import Image
-        
+
         try:
             # Load image
             img = cv2.imread(str(image_path))
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            
+
             # Resize image
             img = cv2.resize(img, self.size)
-            
+
             # Convert to PIL Image for compatibility
             return Image.fromarray(img)
         except Exception as e:
             warnings.warn(f"Error loading image {image_path}: {str(e)}")
             # Return a blank image in case of error
-            return Image.new('RGB', self.size, (0, 0, 0))
-    
+            return Image.new("RGB", self.size, (0, 0, 0))
+
     def resize_mask(self, mask):
         """Resize a mask."""
-        import cv2
-        
+
         # Ensure mask is binary
         if mask.dtype != np.uint8:
             mask = mask.astype(np.uint8)
-            
+
         # Resize mask using nearest neighbor to preserve binary values
         resized_mask = cv2.resize(mask, self.size, interpolation=cv2.INTER_NEAREST)
-        
+
         return resized_mask
-
-

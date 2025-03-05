@@ -1,20 +1,23 @@
 import os
 import warnings
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+from typing import List, Optional, Union
+
+import cv2
 import numpy as np
 import pandas as pd
-from pathlib import Path
 from pycocotools import mask as maskUtils
-from typing import Union, Optional, List
-from core_assist.dataset.format import SegFormatSpec
-import cv2
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
+
+from core_assist.dataset.format import SegFormatSpec
+
 
 class SegmentationMask(SegFormatSpec):
     """Represents a Mask-based segmentation annotation object.
 
     This class processes segmentation data and stores it in a master dataframe,
-    ensuring the segmentation is in RLE format. It supports both single-class and 
+    ensuring the segmentation is in RLE format. It supports both single-class and
     multi-class segmentation masks, handling background classes appropriately.
 
     Args:
@@ -32,7 +35,9 @@ class SegmentationMask(SegFormatSpec):
         - Other integer values represent different classes
     """
 
-    def __init__(self, root: Union[str, os.PathLike], format: Optional[str] = None, mapping=None):
+    def __init__(
+        self, root: Union[str, os.PathLike], format: Optional[str] = None, mapping=None
+    ):
         super().__init__(root, format=format)
         self._is_csv = False
         self.mapping = mapping or {}  # Default to empty dict if mapping is None
@@ -40,24 +45,28 @@ class SegmentationMask(SegFormatSpec):
         if isinstance(root, (str, os.PathLike)) and str(root).endswith(".csv"):
             self._is_csv = True
             self._csv_data = pd.read_csv(root)
-            assert "img_path" in self._csv_data.columns, "CSV must have 'img_path' column."
-            assert "mask_path" in self._csv_data.columns, "CSV must have 'mask_path' column."
+            assert (
+                "img_path" in self._csv_data.columns
+            ), "CSV must have 'img_path' column."
+            assert (
+                "mask_path" in self._csv_data.columns
+            ), "CSV must have 'mask_path' column."
             self._has_splits = "splits" in self._csv_data.columns
         else:
             raise ValueError("Please provide a valid CSV path")
-        
+
         self._resolve_dataframe()
 
     def _resolve_dataframe(self):
         """Processes the input CSV file to create a master dataframe with segmentation information.
-        
+
         This method:
         1. Reads each mask file
         2. Identifies unique classes in each mask
         3. Converts segmentations to RLE format
         4. Computes bounding boxes and areas
         5. Processes images in parallel for efficiency
-        
+
         The resulting dataframe contains:
             - image_id: Unique identifier for each image
             - image_width/height: Dimensions of the image
@@ -71,15 +80,26 @@ class SegmentationMask(SegFormatSpec):
         """
         master_df = pd.DataFrame(
             columns=[
-                "image_id", "image_width", "image_height", "segmentation", "category", "class_id", "image_path", "split",
-                "x_min", "y_min", "width", "height", "area"
+                "image_id",
+                "image_width",
+                "image_height",
+                "segmentation",
+                "category",
+                "class_id",
+                "image_path",
+                "split",
+                "x_min",
+                "y_min",
+                "width",
+                "height",
+                "area",
             ],
         )
 
         if self._is_csv:
             # Create a list to store all results
             all_results = []
-            
+
             def process_row(row_idx, row):
                 try:
                     img_path = Path(row["img_path"])
@@ -89,13 +109,15 @@ class SegmentationMask(SegFormatSpec):
                     # Read mask
                     mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
                     if mask is None:
-                        warnings.warn(f"Could not read mask at {mask_path}. Skipping row {row_idx}.")
+                        warnings.warn(
+                            f"Could not read mask at {mask_path}. Skipping row {row_idx}."
+                        )
                         return []
 
                     image_height, image_width = mask.shape[:2]
                     results = []
                     unique_classes = np.unique(mask)
-                    
+
                     # If the only value is 0 (background), we should still include the image with empty segmentation
                     if len(unique_classes) == 1 and unique_classes[0] == 0:
                         data = {
@@ -123,17 +145,21 @@ class SegmentationMask(SegFormatSpec):
                             # Create binary mask for this class
                             binary_mask = np.zeros_like(mask, dtype=np.uint8)
                             binary_mask[mask == class_id] = 1
-                            
+
                             # Check if mask is empty
                             if np.sum(binary_mask) == 0:
                                 continue
-                                
+
                             # Convert to RLE format
-                            rle_segmentation = maskUtils.encode(np.asfortranarray(binary_mask))
-                            rle_segmentation["counts"] = rle_segmentation["counts"].decode("utf-8")
+                            rle_segmentation = maskUtils.encode(
+                                np.asfortranarray(binary_mask)
+                            )
+                            rle_segmentation["counts"] = rle_segmentation[
+                                "counts"
+                            ].decode("utf-8")
 
                             bbox, area = self.compute_bbox_and_area(rle_segmentation)
-                            
+
                             # Get category name from mapping
                             category = self.mapping.get(int(class_id), str(class_id))
 
@@ -153,7 +179,7 @@ class SegmentationMask(SegFormatSpec):
                                 "area": area,
                             }
                             results.append(data)
-                    
+
                     return results
                 except Exception as e:
                     warnings.warn(f"Error processing row {row_idx}: {e}")
@@ -161,29 +187,38 @@ class SegmentationMask(SegFormatSpec):
 
             # Process in parallel
             with ThreadPoolExecutor() as executor:
-                futures = [executor.submit(process_row, idx, row) for idx, (_, row) in enumerate(self._csv_data.iterrows())]
-                
+                futures = [
+                    executor.submit(process_row, idx, row)
+                    for idx, (_, row) in enumerate(self._csv_data.iterrows())
+                ]
+
                 # Use tqdm for progress tracking
-                for future in tqdm(as_completed(futures), total=len(futures), desc="Processing masks"):
+                for future in tqdm(
+                    as_completed(futures), total=len(futures), desc="Processing masks"
+                ):
                     result = future.result()
                     all_results.extend(result)
-            
+
             # Check if we have any results
             if not all_results:
-                warnings.warn("No valid segmentation data was found in the provided CSV.")
-            
+                warnings.warn(
+                    "No valid segmentation data was found in the provided CSV."
+                )
+
             # Convert all results to DataFrame in one operation (more efficient)
             if all_results:
-                master_df = pd.concat([master_df, pd.DataFrame(all_results)], ignore_index=True)
-        
+                master_df = pd.concat(
+                    [master_df, pd.DataFrame(all_results)], ignore_index=True
+                )
+
         self.master_df = master_df
 
     def compute_bbox_and_area(self, rle_segmentation):
         """Computes bounding box and area from RLE segmentation.
-        
+
         Args:
             rle_segmentation: Run-length encoded segmentation mask
-            
+
         Returns:
             tuple: (bbox, area) where bbox is [x, y, width, height] and area is pixel count
         """

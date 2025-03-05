@@ -1,0 +1,5 @@
+img_path,anno_path
+../dataset/seg_coco/images/Auction_A1_20221106_130919.png,../dataset/seg_coco/annotations/annotations.json
+../dataset/seg_coco/images/Auction_A1_20221106_130925.png,../dataset/seg_coco/annotations/annotations.json
+../dataset/seg_coco/images/Auction_A1_20221107_172154.png,../dataset/seg_coco/annotations/annotations.json
+../dataset/seg_coco/images/Auction_A1_20221108_081642.png,../dataset/seg_coco/annotations/annotations.json
