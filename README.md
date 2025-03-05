@@ -74,7 +74,7 @@ Here’s a quick overview of how to use **core_assist** in your project.
 - **Plotting**: To explore various plotting techniques, check out [plot.ipynb](demos/plot.ipynb).
 - **Validation**: For validation methods and practices, see [validate.ipynb](demos/validate.ipynb).
 - **Metrics**: To understand and compute different metrics, refer to [metrics.ipynb](demos/metrics.ipynb).
-- **Dataset**: For dataset-related tasks and manipulations, explore [dataset.ipynb](demos/dataset.ipynb).
+- **Dataset**: For dataset-related tasks and manipulations, explore [dataset.ipynb](demos/Dataset.ipynb).
 
 ## Documentation
 
