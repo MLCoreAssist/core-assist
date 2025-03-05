@@ -6,3 +6,7 @@ imagesize
 seaborn
 scikit-learn
 scikit-multilearn
+pycocotools
+tqdm
+tabulate
+
