@@ -12,4 +12,4 @@ tabulate
 pyyaml
 mediapy
 pillow<10.0
-bounding_box
+bounding-box

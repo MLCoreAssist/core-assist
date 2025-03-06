@@ -7,8 +7,9 @@ from tqdm.auto import tqdm
 from core_assist.dataset.format import FormatSpec, SegFormatSpec
 from core_assist.dataset.utils import exists, get_annotation_dir, get_image_dir
 
-NUM_THREADS = os.cpu_count() // 2
 import os
+NUM_THREADS = os.cpu_count() // 2
+
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
